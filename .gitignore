@@ -1,0 +1,43 @@
+# Entorno virtual
+venv/
+.venv/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# VS Code
+.vscode/
+
+# PyCharm
+.idea/
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+
+# Datos reales
+data/*.csv
+data/*.xlsx
+data/*.xls
+
+# Informes generados
+reports/*.xlsx
+reports/*.xls
+reports/*.docx
+reports/*.pdf
+
+# Base de datos
+*.db
+*.sqlite
+*.sqlite3
+
+# PyInstaller
+build/
+dist/
+*.spec
+
+# Logs
+*.log
