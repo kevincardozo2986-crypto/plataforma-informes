@@ -38,7 +38,7 @@ class HeroPanel(QFrame):
         coral.cubicTo(width * 0.86, 78, width * 0.90, 155, width, 128)
         coral.lineTo(width, 0)
         coral.closeSubpath()
-        painter.fillPath(coral, QColor("#FF5E70"))
+        painter.fillPath(coral, QColor("#0A4D91"))
 
         cyan = QPainterPath()
         cyan.moveTo(width * 0.42, height)
@@ -46,7 +46,7 @@ class HeroPanel(QFrame):
         cyan.cubicTo(width * 0.92, height * 0.25, width * 0.86, height * 0.58, width, height * 0.48)
         cyan.lineTo(width, height)
         cyan.closeSubpath()
-        painter.fillPath(cyan, QColor("#36BCE8"))
+        painter.fillPath(cyan, QColor("#4A8CC8"))
 
         yellow = QPainterPath()
         yellow.moveTo(0, height * 0.88)
@@ -55,7 +55,7 @@ class HeroPanel(QFrame):
         yellow.lineTo(width, height)
         yellow.lineTo(0, height)
         yellow.closeSubpath()
-        painter.fillPath(yellow, QColor("#FFD21C"))
+        painter.fillPath(yellow, QColor("#DCEAF7"))
 
 
 class LoginWindow(QWidget):

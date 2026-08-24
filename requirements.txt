@@ -1,2 +1,7 @@
 PySide6
+pandas
+numpy
+openpyxl
+xlsxwriter
+matplotlib
 pytest

@@ -1,5 +1,7 @@
 import sys
+from pathlib import Path
 
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
 from app.services.auth_service import initialize_auth
@@ -10,6 +12,9 @@ from app.ui.login_window import LoginWindow
 def main():
     initialize_auth()
     app = QApplication(sys.argv)
+    app.setWindowIcon(
+        QIcon(str(Path(__file__).parent / "app" / "ui" / "assets" / "usta-crest.png"))
+    )
 
     login = LoginWindow()
 

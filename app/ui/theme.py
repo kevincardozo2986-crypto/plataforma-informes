@@ -9,19 +9,19 @@ TURQUOISE = "#36BCE8"
 
 LOGIN_STYLESHEET = """
 QWidget#loginWindow {
-    background-color: #F5F6FA;
-    color: #211568;
+    background-color: #F7F9FC;
+    color: #071D38;
     font-family: "Segoe UI";
 }
 
 QFrame#loginCard {
     background-color: #FFFFFF;
-    border: 1px solid #E4E5EC;
+    border: 1px solid #DCE3EB;
     border-radius: 28px;
 }
 
 QFrame#heroPanel {
-    background-color: #FBFBFC;
+    background-color: #F8FBFE;
     border-top-left-radius: 27px;
     border-bottom-left-radius: 27px;
 }
@@ -31,37 +31,38 @@ QLabel#universityLogo {
 }
 
 QLabel#brandName {
-    color: #211568;
+    color: #0B315B;
     font-size: 10px;
     font-weight: 700;
     letter-spacing: 1px;
 }
 
 QLabel#reportTitle, QLabel#platformTitle {
-    color: #211568;
+    color: #071D38;
     font-size: 36px;
     font-weight: 800;
 }
 
 QLabel#platformTitle {
-    color: #FF5E70;
+    color: #0A4D91;
 }
 
 QLabel#tagline {
-    color: #4F5265;
+    color: #5D7087;
     font-size: 13px;
 }
 
 QLabel#benefitBadge {
     background-color: #FFFFFF;
-    color: #FF5E70;
+    color: #0A4D91;
+    border: 1px solid #D5E2EF;
     border-radius: 26px;
     font-size: 13px;
     font-weight: 800;
 }
 
 QLabel#benefitText {
-    color: #211568;
+    color: #183455;
     font-size: 12px;
 }
 
@@ -76,13 +77,13 @@ QFrame#formPanel {
 }
 
 QLabel#formTitle {
-    color: #211568;
+    color: #071D38;
     font-size: 34px;
     font-weight: 800;
 }
 
 QLabel#formSubtitle, QLabel#securityText {
-    color: #73778A;
+    color: #69798D;
     font-size: 13px;
 }
 
@@ -91,27 +92,27 @@ QLabel#securityText {
 }
 
 QLabel#fieldLabel {
-    color: #211568;
+    color: #183455;
     font-size: 12px;
     font-weight: 700;
 }
 
 QLineEdit {
     background-color: #FFFFFF;
-    color: #211568;
-    border: 1px solid #D8DAE3;
+    color: #102A49;
+    border: 1px solid #CDD7E2;
     border-radius: 11px;
     padding: 0 16px;
     font-size: 13px;
-    selection-background-color: #36BCE8;
+    selection-background-color: #2B72B7;
 }
 
 QLineEdit:hover {
-    border-color: #8D95AB;
+    border-color: #7594B6;
 }
 
 QLineEdit:focus {
-    border: 2px solid #36BCE8;
+    border: 2px solid #1972C8;
     padding: 0 15px;
 }
 
@@ -124,7 +125,7 @@ QLabel#errorLabel {
 }
 
 QPushButton#loginButton {
-    background-color: #FF5E70;
+    background-color: #0A4D91;
     color: #FFFFFF;
     border: none;
     border-radius: 11px;
@@ -133,11 +134,11 @@ QPushButton#loginButton {
 }
 
 QPushButton#loginButton:hover {
-    background-color: #ED4D60;
+    background-color: #073D75;
 }
 
 QPushButton#loginButton:pressed {
-    background-color: #D94154;
+    background-color: #052B55;
 }
 """
 
@@ -301,6 +302,144 @@ QLabel#historyProcessHint { color: #A98400; }
 QFrame#flowStatus { background-color: rgba(255, 255, 255, 210); border: 1px solid #E4E7ED; border-radius: 15px; }
 QLabel#statusDot { background: transparent; color: #36BCE8; font-size: 13px; }
 QLabel#statusText { background: transparent; color: #70778A; font-size: 11px; }
+
+/* Dashboard institucional */
+QWidget#dashboardPage { background-color: #F7F9FC; color: #0B2240; font-family: "Segoe UI"; }
+QFrame#dashboardSidebar { background-color: #052B55; border: none; }
+QLabel#sidebarUniversity { color: #FFFFFF; font-size: 10px; font-weight: 800; letter-spacing: 1px; }
+QLabel#sidebarTitle { color: #FFFFFF; font-family: "Georgia"; font-size: 25px; font-weight: 700; }
+QLabel#sidebarSubtitle { color: #C0CDE0; font-size: 12px; line-height: 1.4; }
+QPushButton#navButton, QPushButton#activeNavButton, QPushButton#logoutNavButton {
+    text-align: left; border: none; border-radius: 9px; padding: 9px 12px;
+    color: #DDE7F4; background: transparent; font-size: 12px; font-weight: 500;
+}
+QPushButton#navButton:hover, QPushButton#logoutNavButton:hover { background-color: #0B3B70; color: #FFFFFF; }
+QPushButton#activeNavButton { background-color: #114A89; color: #FFFFFF; font-weight: 700; }
+QLabel#sidebarAvatar { background-color: #547399; color: #FFFFFF; border-radius: 19px; font-weight: 700; }
+QLabel#sidebarProfile { color: #FFFFFF; font-size: 11px; }
+QWidget#dashboardContent { background-color: #F9FBFE; }
+QLabel#dashboardSection { color: #183455; font-size: 12px; font-weight: 600; }
+QLabel#dashboardUser { color: #142C49; font-size: 12px; font-weight: 600; }
+QFrame#headerLine { background-color: #DDE3EB; border: none; }
+QLabel#routeEyebrow { color: #285998; font-size: 10px; font-weight: 900; letter-spacing: 2px; }
+QLabel#routeTitle { color: #071D38; font-family: "Segoe UI"; font-size: 31px; font-weight: 700; }
+QLabel#routeSubtitle { color: #66758A; font-family: "Segoe UI"; font-size: 13px; font-weight: 400; }
+QWidget#workflowPanel { background: transparent; }
+QFrame#processCard { background-color: #FFFFFF; border: 1px solid #DAE0E8; border-radius: 7px; }
+QFrame#processCard:hover { border: 1px solid #8DA7C7; background-color: #FCFDFF; }
+QLabel#stepBadge { background-color: #062F60; color: #FFFFFF; border-radius: 6px; font-size: 12px; font-weight: 800; }
+QLabel#processIcon { background: transparent; }
+QLabel#processTitle { color: #0B2240; font-size: 16px; font-weight: 800; }
+QLabel#processDescription { color: #647286; font-size: 11px; }
+QPushButton#openModuleButton {
+    background-color: #FFFFFF; color: #06449A; border: 1px solid #E1E6ED;
+    border-radius: 6px; padding: 8px 14px; font-size: 11px; font-weight: 800;
+}
+QPushButton#openModuleButton:hover { background-color: #06449A; color: #FFFFFF; border-color: #06449A; }
+QLabel#dashboardFooter { color: #7D899A; font-size: 9px; }
+"""
+
+
+EXCEL_MODULE_STYLESHEET = """
+QWidget#excelProcessPage, QDialog#excelPreviewDialog {
+    background-color: #F7F9FC; color: #0B2240; font-family: "Segoe UI";
+}
+QFrame#excelHero {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #FFFFFF, stop:0.78 #F4F8FC, stop:1 #E7F0F9);
+    border: none; border-radius: 10px;
+}
+QLabel#excelHeroImage { background: transparent; border: none; }
+QLabel#excelPageTitle { color: #071D38; font-family: "Segoe UI"; font-size: 29px; font-weight: 700; }
+QLabel#excelPageSubtitle { color: #68778B; font-family: "Segoe UI"; font-size: 13px; font-weight: 400; }
+QLabel#excelEyebrow { color: #1A5B9D; font-size: 9px; font-weight: 900; letter-spacing: 2px; }
+QFrame#excelSectionHeader { background: transparent; border: none; }
+QLabel#sectionNumber {
+    background-color: #07427E; color: #FFFFFF; border-radius: 2px;
+    font-size: 12px; font-weight: 900;
+}
+QLabel#excelSectionTitle { background: transparent; color: #124A83; font-size: 13px; font-weight: 800; }
+QPushButton#excelBackButton {
+    background: transparent; color: #174E89; border: none; padding: 7px 0;
+    text-align: left; font-size: 12px; font-weight: 700;
+}
+QPushButton#excelBackButton:hover { color: #0A315D; }
+QFrame#excelSetupCard, QFrame#excelStepRow {
+    background: transparent; border: none;
+}
+QFrame#excelStepRow { border-bottom: 1px solid #D7E0E9; }
+QFrame#excelStepRow:hover { background-color: #EDF4FB; }
+QLabel#excelFieldLabel { color: #183455; font-size: 10px; font-weight: 800; }
+QComboBox {
+    background-color: #FFFFFF; color: #16314F; border: 1px solid #CDD6E1;
+    border-radius: 7px; padding: 8px 11px; min-height: 20px; font-size: 11px;
+}
+QComboBox:focus { border: 1px solid #1B63AF; }
+QLabel#selectedCsvLabel {
+    background-color: #F5F8FB; color: #68778B; border: 1px solid #E0E6ED;
+    border-radius: 7px; padding: 9px 11px; font-size: 10px;
+}
+QFrame#destinationPreview {
+    background-color: #E7F1FA; border: none; border-radius: 7px;
+}
+QLabel#destinationTitle { color: #164E87; font-size: 10px; font-weight: 900; }
+QLabel#destinationPath { color: #355B80; font-size: 10px; }
+QScrollArea#excelStepsScroll { background: transparent; border: none; }
+QScrollArea#excelStepsScroll > QWidget > QWidget { background: transparent; }
+QLabel#excelStepTitle { color: #102A49; font-size: 12px; font-weight: 800; }
+QLabel#excelStepDescription { color: #748195; font-size: 10px; }
+QFrame#stepsColumnsHeader { background-color: #E7EDF3; border: none; }
+QLabel#stepsColumnLabel { color: #59697B; font-size: 9px; font-weight: 800; }
+QLabel#pendingStepBadge, QLabel#availableStepBadge, QLabel#completedStepBadge, QLabel#errorStepBadge {
+    border-radius: 18px; font-size: 13px; font-weight: 900;
+}
+QLabel#pendingStepBadge { background-color: #F0F3F7; color: #8B97A8; }
+QLabel#availableStepBadge { background-color: #E9F2FC; color: #175DA7; }
+QLabel#completedStepBadge { background-color: #E5F7ED; color: #16824B; }
+QLabel#errorStepBadge { background-color: #FDEBEC; color: #C13949; }
+QLabel#pendingStepStatus, QLabel#availableStepStatus, QLabel#completedStepStatus, QLabel#errorStepStatus {
+    font-size: 10px; font-weight: 700;
+}
+QLabel#pendingStepStatus { color: #8B97A8; }
+QLabel#availableStepStatus { color: #175DA7; }
+QLabel#completedStepStatus { color: #16824B; }
+QLabel#errorStepStatus { color: #C13949; }
+QPushButton#stepActionButton, QPushButton#primaryExcelButton, QPushButton#secondaryExcelButton {
+    border-radius: 7px; padding: 9px 15px; font-size: 11px; font-weight: 800;
+}
+QPushButton#primaryExcelButton {
+    background-color: #0A4D91; color: #FFFFFF; border: none;
+}
+QPushButton#primaryExcelButton:hover { background-color: #073A6F; }
+QPushButton#stepActionButton {
+    background-color: #FFFFFF; color: #0A4D91; border: 1px solid #0A4D91;
+}
+QPushButton#stepActionButton:hover { background-color: #EAF3FC; }
+QPushButton#secondaryExcelButton {
+    background-color: #FFFFFF; color: #124C87; border: 1px solid #CDD8E4;
+}
+QPushButton#secondaryExcelButton:hover { background-color: #EDF4FB; }
+QPushButton:disabled { background-color: #E9EDF2; color: #9AA4B2; border-color: #E0E5EB; }
+QLabel#excelFeedback { color: #617187; font-size: 10px; }
+QProgressBar#excelProgressBar {
+    background-color: #DDE6F0; border: none; border-radius: 4px;
+}
+QProgressBar#excelProgressBar::chunk {
+    background-color: #1972C8; border-radius: 4px;
+}
+QTabWidget#previewTabs::pane { background-color: #FFFFFF; border: 1px solid #DCE3EB; border-radius: 7px; }
+QTabBar::tab { background: #EAF0F6; color: #50637A; padding: 9px 14px; margin-right: 2px; }
+QTabBar::tab:selected { background: #0A4D91; color: #FFFFFF; }
+QLabel#previewInfo { color: #52657C; font-size: 10px; font-weight: 700; }
+QTableWidget#excelPreviewTable {
+    background-color: #FFFFFF; alternate-background-color: #F6F9FC;
+    color: #243B55; border: 1px solid #E0E6ED; gridline-color: #E7EBF0; font-size: 10px;
+}
+QTableWidget#excelPreviewTable::item { padding: 5px; }
+QHeaderView::section {
+    background-color: #0A3A6B; color: #FFFFFF; border: none;
+    border-right: 1px solid #315A82; padding: 7px; font-size: 10px; font-weight: 700;
+}
 """
 
 
