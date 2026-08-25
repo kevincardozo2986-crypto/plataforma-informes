@@ -17,14 +17,6 @@ from openpyxl.utils import get_column_letter
 SHEET_NAMES = (
     "Original",
     "Tabla Dinamica Docentes",
-    "Docentes",
-    "Docentes DG",
-    "Tabla Dinamica Estudiantes",
-    "Estudiantes",
-    "Estudiantes DG",
-    "Estudiantes DG2",
-    "Tabla Dinamica Actividades",
-    "Diseño de Cursos",
 )
 
 MESES_ABREVIADOS = {
@@ -46,9 +38,16 @@ MESES_ABREVIADOS = {
 class ExcelProcess:
     """Mantiene un único archivo temporal durante todo el proceso."""
 
-    def __init__(self):
-        self._temporary_directory = tempfile.TemporaryDirectory(prefix="plataforma_informes_")
-        self.path = Path(self._temporary_directory.name) / "informe_en_proceso.xlsx"
+    def __init__(self, existing_path=None):
+        self._temporary_directory = None
+        if existing_path:
+            self.path = Path(existing_path)
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+        else:
+            self._temporary_directory = tempfile.TemporaryDirectory(
+                prefix="plataforma_informes_"
+            )
+            self.path = Path(self._temporary_directory.name) / "informe_en_proceso.xlsx"
         self._row_counts = {}
         self._teacher_summary_cache = None
 
@@ -273,71 +272,9 @@ class ExcelProcess:
             )
         if progress_callback:
             progress_callback(58)
-
-        meses_encontrados = sorted(
-            {mes for meses in dias_por_mes.values() for mes in meses}
+        return self._guardar_tabla_docentes(
+            dias_por_mes, dias_periodo, progress_callback
         )
-        encabezados_resumen = [
-            "CURSO",
-            "DOCENTE",
-            *(MESES_ABREVIADOS[mes] for mes in meses_encontrados),
-            "Total general",
-        ]
-        filas_resumen = []
-        for clave in sorted(
-            dias_por_mes,
-            key=lambda valores: (valores[0].casefold(), valores[1].casefold()),
-        ):
-            curso, docente = clave
-            filas_resumen.append(
-                [
-                    curso,
-                    docente,
-                    *(len(dias_por_mes[clave][mes]) for mes in meses_encontrados),
-                    len(dias_periodo[clave]),
-                ]
-            )
-        if progress_callback:
-            progress_callback(65)
-
-        if progress_callback:
-            progress_callback(70)
-        libro_excel = load_workbook(self.path)
-        if progress_callback:
-            progress_callback(82)
-        nombre_hoja = "Tabla Dinamica Docentes"
-        if nombre_hoja in libro_excel.sheetnames:
-            libro_excel.remove(libro_excel[nombre_hoja])
-        hoja = libro_excel.create_sheet(nombre_hoja)
-        hoja.append(encabezados_resumen)
-        for fila in filas_resumen:
-            hoja.append([self._excel_value(valor) for valor in fila])
-
-        relleno_encabezado = PatternFill("solid", fgColor="0A3A6B")
-        for celda in hoja[1]:
-            celda.fill = relleno_encabezado
-            celda.font = Font(color="FFFFFF", bold=True)
-            celda.alignment = Alignment(horizontal="center", vertical="center")
-        for fila in hoja.iter_rows(min_row=2):
-            fila[0].alignment = Alignment(horizontal="left", vertical="center")
-            fila[1].alignment = Alignment(horizontal="left", vertical="center")
-            for celda in fila[2:]:
-                celda.alignment = Alignment(horizontal="center", vertical="center")
-        hoja.column_dimensions["A"].width = 42
-        hoja.column_dimensions["B"].width = 34
-        for indice in range(3, hoja.max_column + 1):
-            hoja.column_dimensions[get_column_letter(indice)].width = 14
-        hoja.freeze_panes = "C2"
-        hoja.auto_filter.ref = hoja.dimensions
-        if progress_callback:
-            progress_callback(90)
-        libro_excel.save(self.path)
-
-        cantidad_filas = len(filas_resumen)
-        self._row_counts[nombre_hoja] = cantidad_filas
-        if progress_callback:
-            progress_callback(100)
-        return cantidad_filas, [MESES_ABREVIADOS[mes] for mes in meses_encontrados]
 
     def _guardar_tabla_docentes(
         self, dias_por_mes, dias_periodo, progress_callback=None
@@ -350,7 +287,7 @@ class ExcelProcess:
             "CURSO",
             "DOCENTE",
             *(MESES_ABREVIADOS[mes] for mes in meses_encontrados),
-            "Total general",
+            "TOTAL",
         ]
         filas = []
         for clave in sorted(
@@ -363,9 +300,13 @@ class ExcelProcess:
                     curso,
                     docente,
                     *(len(dias_por_mes[clave][mes]) for mes in meses_encontrados),
-                    len(dias_periodo[clave]),
                 ]
             )
+            filas[-1].append(sum(filas[-1][2:]))
+        promedios_mensuales = [
+            round(sum(fila[indice + 2] for fila in filas) / len(filas), 2)
+            for indice in range(len(meses_encontrados))
+        ]
         nombre_hoja = "Tabla Dinamica Docentes"
         ruta_nueva = self.path.with_name("informe_actualizado.xlsx")
         libro_lectura = load_workbook(self.path, read_only=True, data_only=False)
@@ -390,6 +331,27 @@ class ExcelProcess:
         )
         formato_centrado = libro_salida.add_format(
             {"align": "center", "valign": "vcenter"}
+        )
+        formato_total = libro_salida.add_format(
+            {
+                "bold": True,
+                "bg_color": "#E7F1FA",
+                "font_color": "#0A3A6B",
+                "align": "center",
+                "valign": "vcenter",
+            }
+        )
+        formato_promedio = libro_salida.add_format(
+            {
+                "bold": True,
+                "bg_color": "#DDEAF6",
+                "font_color": "#0A3A6B",
+                "align": "center",
+                "valign": "vcenter",
+                "top": 1,
+                "top_color": "#0A4D91",
+                "num_format": "0.00",
+            }
         )
         try:
             original_salida = libro_salida.add_worksheet("Original")
@@ -425,8 +387,20 @@ class ExcelProcess:
                 tabla_salida.write(indice_fila, 0, fila[0])
                 tabla_salida.write(indice_fila, 1, fila[1])
                 tabla_salida.write_row(
-                    indice_fila, 2, fila[2:], formato_centrado
+                    indice_fila, 2, fila[2:-1], formato_centrado
                 )
+                tabla_salida.write(
+                    indice_fila, len(encabezados) - 1, fila[-1], formato_total
+                )
+            fila_promedio = len(filas) + 1
+            tabla_salida.write(fila_promedio, 0, "PROMEDIO", formato_promedio)
+            tabla_salida.write(fila_promedio, 1, "", formato_promedio)
+            tabla_salida.write_row(
+                fila_promedio, 2, promedios_mensuales, formato_promedio
+            )
+            tabla_salida.write(
+                fila_promedio, len(encabezados) - 1, "", formato_promedio
+            )
             tabla_salida.set_column(0, 0, 42)
             tabla_salida.set_column(1, 1, 34)
             tabla_salida.set_column(2, len(encabezados) - 1, 14)
@@ -441,7 +415,7 @@ class ExcelProcess:
         ruta_nueva.replace(self.path)
 
         cantidad_filas = len(filas)
-        self._row_counts[nombre_hoja] = cantidad_filas
+        self._row_counts[nombre_hoja] = cantidad_filas + 1
         if progress_callback:
             progress_callback(100)
         return cantidad_filas, [MESES_ABREVIADOS[mes] for mes in meses_encontrados]

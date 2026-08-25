@@ -22,7 +22,7 @@ class UserFormWidget(QWidget):
 
     def _build_ui(self):
         page = QVBoxLayout(self)
-        page.setContentsMargins(42, 32, 42, 38)
+        page.setContentsMargins(42, 30, 42, 38)
         page.setSpacing(0)
 
         back_button = QPushButton("←  Volver a usuarios")
@@ -34,12 +34,14 @@ class UserFormWidget(QWidget):
         self.title.setObjectName("formPageTitle")
         self.subtitle = QLabel()
         self.subtitle.setObjectName("formPageSubtitle")
+        eyebrow = QLabel("ADMINISTRACIÓN · CUENTAS DE ACCESO")
+        eyebrow.setObjectName("formEyebrow")
 
         card = QFrame()
         card.setObjectName("formCard")
-        card.setMaximumWidth(760)
+        card.setMaximumWidth(780)
         card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(34, 30, 34, 30)
+        card_layout.setContentsMargins(36, 30, 36, 30)
         card_layout.setSpacing(0)
 
         self.username_input = self._field("Nombre de usuario")
@@ -58,6 +60,13 @@ class UserFormWidget(QWidget):
         self.error_label.setWordWrap(True)
         self.error_label.hide()
 
+        form_help = QLabel(
+            "Los datos de esta cuenta se usarán para ingresar a la plataforma. "
+            "Asigna permisos de administrador únicamente cuando sea necesario."
+        )
+        form_help.setObjectName("formHelp")
+        form_help.setWordWrap(True)
+
         actions = QHBoxLayout()
         actions.addStretch()
         cancel_button = QPushButton("Cancelar")
@@ -69,6 +78,8 @@ class UserFormWidget(QWidget):
         actions.addWidget(cancel_button)
         actions.addWidget(self.save_button)
 
+        card_layout.addWidget(form_help)
+        card_layout.addSpacing(24)
         self._add_field(card_layout, "Usuario", self.username_input)
         self._add_field(card_layout, "Nombre completo", self.full_name_input)
         self._add_field(card_layout, "Contraseña", self.password_input)
@@ -80,7 +91,9 @@ class UserFormWidget(QWidget):
         card_layout.addLayout(actions)
 
         page.addWidget(back_button, alignment=Qt.AlignLeft)
-        page.addSpacing(28)
+        page.addSpacing(22)
+        page.addWidget(eyebrow)
+        page.addSpacing(5)
         page.addWidget(self.title)
         page.addSpacing(6)
         page.addWidget(self.subtitle)

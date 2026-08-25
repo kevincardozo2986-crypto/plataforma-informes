@@ -28,6 +28,7 @@ reports/*.xlsx
 reports/*.xls
 reports/*.docx
 reports/*.pdf
+/Informe_*.xlsx
 
 # Base de datos
 *.db

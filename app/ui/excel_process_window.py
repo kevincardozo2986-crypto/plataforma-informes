@@ -12,6 +12,10 @@ from PySide6.QtWidgets import (
 
 from app.services.csv_service import estimate_csv_rows, inspect_csv_structure, iter_csv_chunks
 from app.services.excel_service import ExcelProcess
+from app.services.process_history_service import (
+    mark_process_completed,
+    save_process_progress,
+)
 from app.services.report_option_service import (
     add_report_option,
     delete_report_option,
@@ -104,7 +108,7 @@ class ProcessStepRow(QFrame):
         self.status.setObjectName(f"{state}StepStatus")
         self.status.style().unpolish(self.status)
         self.status.style().polish(self.status)
-        self.button.setEnabled(state == "available")
+        self.button.setEnabled(state in {"available", "error"})
 
 
 class OptionManagementDialog(QDialog):
@@ -249,9 +253,11 @@ class ExcelProcessWindow(QWidget):
         self.csv_path = None
         self.base_directory = None
         self.report_paths = None
+        self.completed_step = 0
         self.steps = []
         self._thread = None
         self._worker = None
+        self._control_states = {}
         self.setStyleSheet(EXCEL_MODULE_STYLESHEET)
         self._build_ui()
 
@@ -439,8 +445,8 @@ class ExcelProcessWindow(QWidget):
             ("Crear hoja Original", "Copia todos los datos del CSV sin transformarlos.", True),
             ("Convertir FechaUnix", "Agrega Fecha, Mes y Dia junto a FechaUnix en Original.", True),
             (
-                "Crear Tabla Docentes",
-                "Cuenta días distintos por curso, docente y mes.",
+                "Procesar docentes",
+                "Calcula días distintos, totales y promedios por mes.",
                 True,
             ),
         )
@@ -619,7 +625,12 @@ class ExcelProcessWindow(QWidget):
             reemplazar_csv = True
         rutas_informe = self.report_paths
         ruta_csv_origen = self.csv_path
-        self.excel_process = ExcelProcess()
+        ruta_borrador = (
+            rutas_informe.directory
+            / f"{rutas_informe.excel.stem}_EN_PROCESO.xlsx"
+        )
+        self.excel_process = ExcelProcess(ruta_borrador)
+        self.completed_step = 0
         datos_academicos = (
             self.base_directory,
             self.period.currentText(),
@@ -663,6 +674,7 @@ class ExcelProcessWindow(QWidget):
         self.feedback.setText(
             f"CSV cargado y validado: {cantidad_columnas} columnas. Ejecuta el paso 1 para crear Original."
         )
+        self._guardar_avance(0)
 
     def _actualizar_estado_boton_carga(self, cargado):
         """Diferencia visualmente un CSV pendiente de uno ya cargado."""
@@ -674,15 +686,14 @@ class ExcelProcessWindow(QWidget):
         self.load_button.style().polish(self.load_button)
 
     def _task_failed(self, step_index, title, message):
-        self.steps[step_index].set_state("error", "No se pudo completar")
+        self.steps[step_index].set_state("error", "Error · Intentar de nuevo")
+        self._guardar_avance(self.completed_step, status="error", error_message=message)
         show_error(self, title, message)
 
     def _start_background(self, operation, on_success, on_error):
         if self._thread and self._thread.isRunning():
             return
-        self.load_button.setEnabled(False)
-        self.preview_button.setEnabled(False)
-        self.save_button.setEnabled(False)
+        self._bloquear_controles()
         self.feedback.setText("Procesando el archivo por bloques. La aplicación seguirá respondiendo…")
         self.progress_bar.setValue(1)
         self.progress_bar.show()
@@ -691,11 +702,32 @@ class ExcelProcessWindow(QWidget):
         self._worker.moveToThread(self._thread)
         self._thread.started.connect(self._worker.run)
         self._worker.progress.connect(self.progress_bar.setValue)
-        self._worker.finished.connect(on_success)
-        self._worker.failed.connect(on_error)
         self._worker.finished.connect(self._finish_background)
         self._worker.failed.connect(self._finish_background)
+        self._worker.finished.connect(on_success)
+        self._worker.failed.connect(on_error)
         self._thread.start()
+
+    def _bloquear_controles(self):
+        """Evita acciones simultáneas mientras se modifica el Excel."""
+        controles = [
+            *self.findChildren(QPushButton),
+            *self.findChildren(QComboBox),
+        ]
+        self._control_states = {
+            control: control.isEnabled() for control in controles
+        }
+        for control in controles:
+            control.setEnabled(False)
+
+    def _restaurar_controles(self):
+        """Recupera el estado que cada control tenía antes del proceso."""
+        for control, estaba_habilitado in self._control_states.items():
+            try:
+                control.setEnabled(estaba_habilitado)
+            except RuntimeError:
+                pass
+        self._control_states.clear()
 
     @Slot()
     def _finish_background(self, *_):
@@ -706,6 +738,7 @@ class ExcelProcessWindow(QWidget):
         self._thread.deleteLater()
         self._worker = None
         self._thread = None
+        self._restaurar_controles()
         self.load_button.setEnabled(bool(self.csv_path and self.base_directory))
         excel_disponible = self.excel_process.exists
         self.preview_button.setEnabled(excel_disponible)
@@ -746,6 +779,8 @@ class ExcelProcessWindow(QWidget):
         self.feedback.setText(
             f"Hoja Original creada: {cantidad_filas:,} registros y {cantidad_columnas} columnas."
         )
+        self.completed_step = 1
+        self._guardar_avance(1)
 
     def _information_prepared(self, resultado_preparacion):
         cantidad_filas, cantidad_columnas = resultado_preparacion
@@ -756,6 +791,8 @@ class ExcelProcessWindow(QWidget):
         self.feedback.setText(
             f"FechaUnix convertida: se actualizaron {cantidad_filas:,} registros en la hoja Original."
         )
+        self.completed_step = 2
+        self._guardar_avance(2)
 
     def _crear_tabla_docentes(self):
         self.steps[2].set_state("available", "Procesando…")
@@ -776,6 +813,80 @@ class ExcelProcessWindow(QWidget):
             f"Tabla Dinamica Docentes creada: {cantidad_filas:,} filas; "
             f"meses: {', '.join(meses)}."
         )
+        self.completed_step = 3
+        self._guardar_avance(3)
+
+    def _guardar_avance(self, paso_completado, status="in_progress", error_message=None):
+        """Guarda el punto de recuperación sin interrumpir el proceso si SQLite falla."""
+        if not self.report_paths or not self.excel_process.path:
+            return
+        try:
+            save_process_progress(
+                self.usuario_actual,
+                self.period.currentText(),
+                self.level.currentText(),
+                self.modality.currentText(),
+                self.program.currentText(),
+                self.base_directory,
+                self.report_paths.source_csv,
+                self.excel_process.path,
+                paso_completado,
+                status,
+                error_message,
+            )
+        except Exception as error:
+            self.feedback.setText(
+                f"El proceso continúa, pero no se pudo guardar el punto de recuperación: {error}"
+            )
+
+    def resume_process(self, proceso):
+        """Restaura la configuración y habilita el siguiente paso pendiente."""
+        ruta_excel = Path(proceso["workbook_path"])
+        ruta_csv = Path(proceso["source_csv"])
+        if proceso["completed_step"] > 0 and not ruta_excel.is_file():
+            show_error(
+                self,
+                "No se puede continuar",
+                "El Excel de trabajo ya no existe en la ubicación registrada.",
+            )
+            return False
+
+        selectores = (
+            (self.period, proceso["period"]),
+            (self.level, proceso["level"]),
+            (self.modality, proceso["modality"]),
+            (self.program, proceso["program"]),
+        )
+        for selector, valor in selectores:
+            if selector.findText(valor) < 0:
+                selector.addItem(valor)
+            selector.setCurrentText(valor)
+
+        self.base_directory = proceso["base_directory"]
+        self.csv_path = ruta_csv
+        self.base_label.setText(str(self.base_directory))
+        self.base_label.setToolTip(str(self.base_directory))
+        self.file_label.setText(ruta_csv.name)
+        self.file_label.setToolTip(str(ruta_csv))
+        self._update_destination()
+        self.excel_process = ExcelProcess(ruta_excel)
+        self.completed_step = int(proceso["completed_step"])
+
+        for indice, paso in enumerate(self.steps):
+            if indice < self.completed_step:
+                paso.set_state("completed")
+            elif indice == self.completed_step:
+                paso.set_state("available", "Continuar desde aquí")
+            else:
+                paso.set_state("pending")
+        archivo_disponible = ruta_excel.is_file()
+        self.preview_button.setEnabled(archivo_disponible)
+        self.save_button.setEnabled(archivo_disponible)
+        self.feedback.setText(
+            f"Proceso recuperado: {proceso['program']} · paso "
+            f"{self.completed_step} de {len(self.steps)} completado."
+        )
+        return True
 
     def _preview(self):
         exec_modal(ExcelPreviewDialog(self.excel_process, self))
@@ -798,6 +909,7 @@ class ExcelProcessWindow(QWidget):
             show_error(self, "No se pudo guardar", str(error))
             return
         self.feedback.setText(f"Excel guardado en {destination}")
+        mark_process_completed(self.excel_process.path)
         show_info(
             self,
             "Excel guardado",

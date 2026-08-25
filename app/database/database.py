@@ -69,3 +69,23 @@ def initialize_database() -> None:
                 "INSERT OR IGNORE INTO report_options (category, value) VALUES (?, ?)",
                 ((categoria, valor) for valor in valores),
             )
+        conexion.execute(
+            """
+            CREATE TABLE IF NOT EXISTS report_processes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                period TEXT NOT NULL,
+                level TEXT NOT NULL,
+                modality TEXT NOT NULL,
+                program TEXT NOT NULL,
+                base_directory TEXT NOT NULL,
+                source_csv TEXT NOT NULL,
+                workbook_path TEXT NOT NULL UNIQUE,
+                completed_step INTEGER NOT NULL DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'in_progress',
+                error_message TEXT,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )

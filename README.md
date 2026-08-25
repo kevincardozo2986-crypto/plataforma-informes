@@ -23,6 +23,8 @@ Aplicación de escritorio para transformar archivos CSV exportados desde Moodle 
 - Detección automática de codificación y separador del CSV.
 - Procesamiento de archivos grandes por bloques.
 - Generación y previsualización del mismo libro Excel de trabajo.
+- Guardado automático del avance y recuperación de informes incompletos.
+- Reintento de pasos fallidos sin cerrar la aplicación.
 - Interfaz institucional con ventanas y diálogos personalizados.
 
 Actualmente se generan exclusivamente estas hojas:
@@ -46,7 +48,7 @@ Para cada combinación de curso, docente y mes calcula la cantidad de días dife
 nunique(Dia)
 ```
 
-Los meses se generan dinámicamente con base en los datos disponibles. La columna `Total general` vuelve a calcular los días distintos de todo el periodo; no suma directamente las columnas mensuales.
+Los meses se generan dinámicamente con base en los datos disponibles. La columna `TOTAL` suma los valores mensuales de cada docente y al final se agrega una fila `PROMEDIO` con el promedio de cada mes.
 
 ## Requisitos del CSV
 
@@ -128,7 +130,7 @@ Se recomienda cambiar esta contraseña desde la administración de usuarios ante
 6. Pulsa `Cargar CSV`.
 7. Ejecuta `Crear hoja Original`.
 8. Ejecuta `Convertir FechaUnix`.
-9. Ejecuta `Crear Tabla Docentes`.
+9. Ejecuta `Procesar docentes`.
 10. Previsualiza y guarda el Excel resultante.
 
 El administrador puede agregar, editar o eliminar las opciones académicas. Los usuarios normales solo pueden seleccionarlas.
@@ -141,7 +143,7 @@ Ejecuta la suite con:
 python -m pytest -q
 ```
 
-La suite actual contiene 37 pruebas automatizadas.
+La suite actual contiene 39 pruebas automatizadas.
 
 ## Datos locales
 

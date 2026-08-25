@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QListWidget,
+    QListWidgetItem,
     QMainWindow,
     QPushButton,
     QVBoxLayout,
@@ -23,6 +24,7 @@ from app.ui.modal_dialogs import MODAL_STYLE, exec_modal
 from app.ui.window_chrome import preparar_ventana_sin_marco
 from app.ui.excel_process_window import ExcelProcessWindow
 from app.ui.users_window import UsersPage
+from app.services.process_history_service import list_incomplete_processes
 
 ASSETS = Path(__file__).parent / "assets"
 
@@ -290,6 +292,71 @@ class DashboardWindow(QMainWindow):
         self.stack.setCurrentWidget(self.excel_page)
 
     def _open_history(self):
+        procesos = list_incomplete_processes(self.user)
+        dialog = QDialog(self)
+        dialog.setObjectName("institutionalDialog")
+        dialog.setStyleSheet(MODAL_STYLE)
+        dialog.setWindowTitle("Historial de informes")
+        dialog.setMinimumSize(680, 430)
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(preparar_ventana_sin_marco(dialog, "Historial de informes", False))
+        content = QVBoxLayout()
+        content.setContentsMargins(24, 22, 24, 20)
+        content.setSpacing(12)
+        title = QLabel("Informes pendientes")
+        title.setStyleSheet("font-size: 18px; font-weight: 700; color: #071D38;")
+        description = QLabel(
+            "Selecciona un proceso para continuar desde el último paso completado."
+        )
+        description.setStyleSheet("color: #526A82; font-size: 11px;")
+        results = QListWidget()
+        for proceso in procesos:
+            estado = "Con error" if proceso["status"] == "error" else "En proceso"
+            item = QListWidgetItem(
+                f"{proceso['period']}  ·  {proceso['program']}  ·  "
+                f"{proceso['modality']}\n"
+                f"{estado}  —  Paso {proceso['completed_step']} de 3  —  "
+                f"Actualizado: {proceso['updated_at']}"
+            )
+            item.setData(Qt.UserRole, proceso)
+            results.addItem(item)
+        if not procesos:
+            results.addItem("No hay informes pendientes. Todos los procesos están completos.")
+
+        actions = QHBoxLayout()
+        saved = QPushButton("Buscar Excel guardados")
+        saved.setObjectName("dialogSecondaryButton")
+        saved.clicked.connect(lambda: (dialog.accept(), self._open_saved_history()))
+        resume = QPushButton("Continuar informe")
+        resume.setObjectName("dialogPrimaryButton")
+        resume.setEnabled(bool(procesos))
+
+        def continue_selected():
+            item = results.currentItem()
+            proceso = item.data(Qt.UserRole) if item else None
+            if proceso and self.excel_page.resume_process(proceso):
+                dialog.accept()
+                self.stack.setCurrentWidget(self.excel_page)
+
+        resume.clicked.connect(continue_selected)
+        results.itemDoubleClicked.connect(lambda _: continue_selected())
+        close = QPushButton("Cerrar")
+        close.setObjectName("dialogSecondaryButton")
+        close.clicked.connect(dialog.reject)
+        actions.addWidget(saved)
+        actions.addStretch()
+        actions.addWidget(close)
+        actions.addWidget(resume)
+        content.addWidget(title)
+        content.addWidget(description)
+        content.addWidget(results, 1)
+        content.addLayout(actions)
+        layout.addLayout(content, 1)
+        exec_modal(dialog)
+
+    def _open_saved_history(self):
         carpeta = QFileDialog.getExistingDirectory(
             self, "Seleccionar carpeta donde buscar informes"
         )

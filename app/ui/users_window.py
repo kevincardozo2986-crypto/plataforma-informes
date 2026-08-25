@@ -76,8 +76,8 @@ class UsersPage(QWidget):
         self.list_page = QWidget()
         self.list_page.setObjectName("usersPage")
         page = QVBoxLayout(self.list_page)
-        page.setContentsMargins(34, 24, 34, 28)
-        page.setSpacing(14)
+        page.setContentsMargins(36, 26, 36, 30)
+        page.setSpacing(16)
 
         back_button = QPushButton("←  Volver")
         back_button.setObjectName("pageBackButton")
@@ -104,24 +104,27 @@ class UsersPage(QWidget):
         logo_path = Path(__file__).parent / "assets" / "usta-crest.png"
         logo.setPixmap(
             QPixmap(str(logo_path)).scaled(
-                66, 66, Qt.KeepAspectRatio, Qt.SmoothTransformation
+                52, 52, Qt.KeepAspectRatio, Qt.SmoothTransformation
             )
         )
-        logo.setFixedSize(70, 70)
+        logo.setFixedSize(56, 56)
 
         heading = QVBoxLayout()
         heading.setSpacing(3)
+        eyebrow = QLabel("ADMINISTRACIÓN · CONTROL DE ACCESO")
+        eyebrow.setObjectName("pageEyebrow")
         title = QLabel("Gestión de usuarios")
         title.setObjectName("pageTitle")
         subtitle = QLabel("Administra las cuentas y permisos de acceso al sistema")
         subtitle.setObjectName("pageSubtitle")
+        heading.addWidget(eyebrow)
         heading.addWidget(title)
         heading.addWidget(subtitle)
 
-        admin_badge = QLabel("ADMINISTRADOR")
+        admin_badge = QLabel("ACCESO ADMINISTRADOR")
         admin_badge.setObjectName("adminBadge")
 
-        new_button = QPushButton("+  Nuevo usuario")
+        new_button = QPushButton("＋  Nuevo usuario")
         new_button.setObjectName("primaryButton")
         new_button.setCursor(Qt.PointingHandCursor)
         new_button.clicked.connect(self._create_user)
@@ -137,9 +140,9 @@ class UsersPage(QWidget):
     def _create_stats(self):
         stats = QHBoxLayout()
         stats.setSpacing(14)
-        self.total_value, total_card = self._stat_card("Usuarios registrados", "#211568")
-        self.active_value, active_card = self._stat_card("Usuarios activos", "#36BCE8")
-        self.admin_value, admin_card = self._stat_card("Administradores", "#FF5E70")
+        self.total_value, total_card = self._stat_card("Usuarios registrados", "#0A4D91")
+        self.active_value, active_card = self._stat_card("Usuarios activos", "#16824B")
+        self.admin_value, admin_card = self._stat_card("Administradores", "#D49A00")
         stats.addWidget(total_card)
         stats.addWidget(active_card)
         stats.addWidget(admin_card)
@@ -186,19 +189,25 @@ class UsersPage(QWidget):
         table_heading.addWidget(table_title)
         table_heading.addWidget(table_subtitle)
 
+        self.directory_count = QLabel("0 registros")
+        self.directory_count.setObjectName("directoryCount")
+
         self.search_input = QLineEdit()
         self.search_input.setObjectName("searchInput")
-        self.search_input.setPlaceholderText("Buscar por nombre, usuario o rol...")
-        self.search_input.setFixedWidth(390)
-        self.search_input.setFixedHeight(42)
+        self.search_input.setPlaceholderText("Buscar usuario, nombre o rol")
+        self.search_input.setClearButtonEnabled(True)
+        self.search_input.setFixedWidth(360)
+        self.search_input.setFixedHeight(40)
         self.search_input.textChanged.connect(self._filter_table)
 
         toolbar.addLayout(table_heading)
         toolbar.addStretch()
+        toolbar.addWidget(self.directory_count)
         toolbar.addWidget(self.search_input)
         layout.addLayout(toolbar)
 
         self.table = QTableWidget(0, 6)
+        self.table.setObjectName("usersTable")
         self.table.setHorizontalHeaderLabels(
             ["USUARIO", "NOMBRE COMPLETO", "ROL", "ESTADO", "CREADO", "ACCIONES"]
         )
@@ -277,6 +286,7 @@ class UsersPage(QWidget):
         self.admin_value.setText(
             str(sum(user["role"] == "admin" for user in self.users))
         )
+        self.directory_count.setText(f"{len(self.users)} registros")
         self._filter_table(self.search_input.text())
 
     def _user_cell(self, user):

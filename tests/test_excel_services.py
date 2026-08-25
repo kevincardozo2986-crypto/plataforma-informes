@@ -99,16 +99,20 @@ def test_crea_tabla_docentes_con_dias_distintos_y_meses_dinamicos():
     assert meses == ["FEB", "MAR"]
     assert proceso.sheet_names() == ["Original", "Tabla Dinamica Docentes"]
     encabezados, filas, total = proceso.preview_sheet("Tabla Dinamica Docentes")
-    assert encabezados == ["CURSO", "DOCENTE", "FEB", "MAR", "Total general"]
-    assert total == 2
-    assert filas[0] == ("Curso A", "Ana", 2, 2, 3)
+    assert encabezados == ["CURSO", "DOCENTE", "FEB", "MAR", "TOTAL"]
+    assert total == 3
+    assert filas[0] == ("Curso A", "Ana", 2, 2, 4)
     assert filas[1] == ("Curso B", "Luis", 0, 1, 1)
+    assert filas[2] == ("PROMEDIO", None, 1, 1.5, None)
 
     libro = load_workbook(proceso.path)
     hoja = libro["Tabla Dinamica Docentes"]
     assert hoja.freeze_panes == "C2"
     assert hoja["A1"].font.bold is True
     assert hoja["C2"].alignment.horizontal == "center"
+    assert hoja["E2"].font.bold is True
+    assert hoja["A4"].value == "PROMEDIO"
+    assert hoja["A4"].font.bold is True
     libro.close()
 
 
