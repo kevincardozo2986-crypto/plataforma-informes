@@ -9,7 +9,6 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QLabel,
     QLineEdit,
-    QMessageBox,
     QPushButton,
     QStackedWidget,
     QTableWidget,
@@ -25,6 +24,7 @@ from app.services.user_service import (
     update_user,
 )
 from app.ui.user_form_widget import UserFormWidget
+from app.ui.modal_dialogs import ask_confirmation, show_error, show_warning
 from app.ui.theme import USERS_STYLESHEET
 
 
@@ -227,7 +227,7 @@ class UsersPage(QWidget):
         try:
             self.users = list_users(self.current_user)
         except (PermissionError, ValueError) as error:
-            QMessageBox.critical(self, "Acceso denegado", str(error))
+            show_error(self, "Acceso denegado", str(error))
             self.close()
             return
 
@@ -423,21 +423,19 @@ class UsersPage(QWidget):
             )
             self._load_users()
         except (PermissionError, ValueError) as error:
-            QMessageBox.warning(self, "No se pudo cambiar el estado", str(error))
+            show_warning(self, "No se pudo cambiar el estado", str(error))
 
     def _delete_user(self, user):
-        answer = QMessageBox.question(
+        confirmado = ask_confirmation(
             self,
             "Eliminar usuario",
             f"¿Eliminar definitivamente a {user['username']}?",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
         )
-        if answer != QMessageBox.Yes:
+        if not confirmado:
             return
 
         try:
             delete_user(self.current_user, user["id"])
             self._load_users()
         except (PermissionError, ValueError) as error:
-            QMessageBox.warning(self, "No se pudo eliminar", str(error))
+            show_warning(self, "No se pudo eliminar", str(error))

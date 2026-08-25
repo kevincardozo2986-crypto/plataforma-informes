@@ -10,128 +10,133 @@ class CSVValidationError(ValueError):
     pass
 
 
-def detect_csv_format(path):
+def detect_csv_format(ruta_archivo):
     """Detecta codificación y separador leyendo solo una pequeña muestra."""
-    csv_path = Path(path)
-    if not csv_path.is_file() or csv_path.suffix.lower() != ".csv":
+    ruta_csv = Path(ruta_archivo)
+    if not ruta_csv.is_file() or ruta_csv.suffix.lower() != ".csv":
         raise CSVValidationError("Selecciona un archivo CSV válido.")
-    for encoding in ("utf-8-sig", "utf-8", "latin-1"):
+    for codificacion in ("utf-8-sig", "utf-8", "latin-1"):
         try:
-            with csv_path.open("r", encoding=encoding, newline="") as source:
-                sample = source.read(64 * 1024)
+            with ruta_csv.open("r", encoding=codificacion, newline="") as archivo:
+                muestra = archivo.read(64 * 1024)
             try:
-                delimiter = csv.Sniffer().sniff(sample, delimiters=",;\t|").delimiter
+                separador = csv.Sniffer().sniff(muestra, delimiters=",;\t|").delimiter
             except csv.Error:
-                delimiter = ","
-            return encoding, delimiter
+                separador = ","
+            return codificacion, separador
         except UnicodeDecodeError:
             continue
     raise CSVValidationError("No fue posible detectar el formato del CSV.")
 
 
-def iter_csv_chunks(path, chunksize=25_000, prepare=False):
+def iter_csv_chunks(ruta_archivo, chunksize=25_000, prepare=False):
     """Entrega bloques para evitar cargar archivos grandes completos en memoria."""
-    encoding, delimiter = detect_csv_format(path)
+    codificacion, separador = detect_csv_format(ruta_archivo)
     try:
-        chunks = pd.read_csv(
-            path,
-            sep=delimiter,
-            encoding=encoding,
+        bloques_csv = pd.read_csv(
+            ruta_archivo,
+            sep=separador,
+            encoding=codificacion,
             chunksize=chunksize,
             dtype_backend="numpy_nullable",
         )
-        for chunk in chunks:
-            chunk.columns = [str(column).strip() for column in chunk.columns]
-            yield prepare_original_data(chunk) if prepare else chunk
+        for bloque_datos in bloques_csv:
+            bloque_datos.columns = [str(columna).strip() for columna in bloque_datos.columns]
+            yield prepare_original_data(bloque_datos) if prepare else bloque_datos
     except pd.errors.ParserError as error:
         raise CSVValidationError(f"No fue posible interpretar el CSV: {error}") from error
 
 
-def inspect_csv_structure(path):
+def inspect_csv_structure(ruta_archivo):
     """Valida encabezados leyendo solo una muestra, sin recorrer el archivo completo."""
-    encoding, delimiter = detect_csv_format(path)
+    codificacion, separador = detect_csv_format(ruta_archivo)
     try:
-        sample = pd.read_csv(
-            path,
-            sep=delimiter,
-            encoding=encoding,
+        muestra_datos = pd.read_csv(
+            ruta_archivo,
+            sep=separador,
+            encoding=codificacion,
             nrows=5,
             dtype_backend="numpy_nullable",
         )
     except pd.errors.ParserError as error:
         raise CSVValidationError(f"No fue posible interpretar el CSV: {error}") from error
-    columns = [str(column).strip() for column in sample.columns]
-    if not columns:
+    columnas = [str(columna).strip() for columna in muestra_datos.columns]
+    if not columnas:
         raise CSVValidationError("El archivo no contiene columnas.")
-    if "fechaunix" not in {column.casefold() for column in columns}:
+    if "fechaunix" not in {columna.casefold() for columna in columnas}:
         raise CSVValidationError("El CSV no contiene la columna requerida 'FechaUnix'.")
-    return columns
+    return columnas
 
 
-def estimate_csv_rows(path):
+def estimate_csv_rows(ruta_archivo):
     """Cuenta saltos de línea rápidamente para calcular progreso aproximado."""
-    line_count = 0
-    with Path(path).open("rb") as source:
-        while block := source.read(4 * 1024 * 1024):
-            line_count += block.count(b"\n")
-    return max(line_count - 1, 1)
+    cantidad_lineas = 0
+    with Path(ruta_archivo).open("rb") as archivo:
+        while bloque := archivo.read(4 * 1024 * 1024):
+            cantidad_lineas += bloque.count(b"\n")
+    return max(cantidad_lineas - 1, 1)
 
 
-def read_csv_file(path):
+def read_csv_file(ruta_archivo):
     """Lee un CSV detectando separador y probando codificaciones comunes."""
-    csv_path = Path(path)
-    if not csv_path.is_file() or csv_path.suffix.lower() != ".csv":
+    ruta_csv = Path(ruta_archivo)
+    if not ruta_csv.is_file() or ruta_csv.suffix.lower() != ".csv":
         raise CSVValidationError("Selecciona un archivo CSV válido.")
-    encoding, delimiter = detect_csv_format(csv_path)
+    codificacion, separador = detect_csv_format(ruta_csv)
     try:
-        frame = pd.read_csv(
-            csv_path,
-            sep=delimiter,
-            encoding=encoding,
+        datos_csv = pd.read_csv(
+            ruta_csv,
+            sep=separador,
+            encoding=codificacion,
             dtype_backend="numpy_nullable",
         )
     except pd.errors.ParserError as error:
         raise CSVValidationError(f"No fue posible interpretar el CSV: {error}") from error
-    if not len(frame.columns):
+    if not len(datos_csv.columns):
         raise CSVValidationError("El archivo no contiene columnas.")
-    frame.columns = [str(column).strip() for column in frame.columns]
-    return frame
+    datos_csv.columns = [str(columna).strip() for columna in datos_csv.columns]
+    return datos_csv
 
 
-def derive_date_columns_from_unix(frame, timezone="America/Bogota"):
+def derive_date_columns_from_unix(datos, timezone="America/Bogota"):
     """Agrega Fecha, Mes y Dia a partir de la columna FechaUnix de Moodle."""
-    prepared = frame.copy()
-    normalized = {str(column).strip().casefold(): column for column in prepared.columns}
-    unix_column = normalized.get("fechaunix")
-    if unix_column is None:
+    datos_preparados = datos.copy()
+    columnas_normalizadas = {
+        str(columna).strip().casefold(): columna for columna in datos_preparados.columns
+    }
+    columna_fecha_unix = columnas_normalizadas.get("fechaunix")
+    if columna_fecha_unix is None:
         raise CSVValidationError("El CSV no contiene la columna requerida 'FechaUnix'.")
 
-    numeric_values = pd.to_numeric(prepared[unix_column], errors="coerce")
-    valid_values = numeric_values.dropna()
-    if valid_values.empty:
+    valores_numericos = pd.to_numeric(datos_preparados[columna_fecha_unix], errors="coerce")
+    valores_validos = valores_numericos.dropna()
+    if valores_validos.empty:
         raise CSVValidationError("La columna 'FechaUnix' no contiene valores Unix válidos.")
 
-    typical_value = valid_values.abs().median()
-    unit = "ms" if typical_value >= 100_000_000_000 else "s"
-    dates = pd.to_datetime(numeric_values, unit=unit, errors="coerce", utc=True)
-    local_dates = dates.dt.tz_convert(timezone).dt.tz_localize(None)
+    valor_representativo = valores_validos.abs().median()
+    unidad_tiempo = "ms" if valor_representativo >= 100_000_000_000 else "s"
+    fechas_utc = pd.to_datetime(
+        valores_numericos, unit=unidad_tiempo, errors="coerce", utc=True
+    )
+    fechas_locales = fechas_utc.dt.tz_convert(timezone).dt.tz_localize(None)
 
-    derived_names = {"fecha", "mes", "dia", "día"}
-    existing_derived = [
-        column
-        for column in prepared.columns
-        if str(column).strip().casefold() in derived_names and column != unix_column
+    nombres_columnas_derivadas = {"fecha", "mes", "dia", "día"}
+    columnas_derivadas_existentes = [
+        columna
+        for columna in datos_preparados.columns
+        if str(columna).strip().casefold() in nombres_columnas_derivadas
+        and columna != columna_fecha_unix
     ]
-    if existing_derived:
-        prepared = prepared.drop(columns=existing_derived)
+    if columnas_derivadas_existentes:
+        datos_preparados = datos_preparados.drop(columns=columnas_derivadas_existentes)
 
-    insert_at = prepared.columns.get_loc(unix_column) + 1
-    prepared.insert(insert_at, "Fecha", local_dates.dt.date)
-    prepared.insert(insert_at + 1, "Mes", local_dates.dt.month.astype("Int64"))
-    prepared.insert(insert_at + 2, "Dia", local_dates.dt.day.astype("Int64"))
-    return prepared
+    posicion_insercion = datos_preparados.columns.get_loc(columna_fecha_unix) + 1
+    datos_preparados.insert(posicion_insercion, "Fecha", fechas_locales.dt.date)
+    datos_preparados.insert(posicion_insercion + 1, "Mes", fechas_locales.dt.month.astype("Int64"))
+    datos_preparados.insert(posicion_insercion + 2, "Dia", fechas_locales.dt.day.astype("Int64"))
+    return datos_preparados
 
 
-def prepare_original_data(frame):
+def prepare_original_data(datos):
     """Alias compatible para la preparación actual de la hoja Original."""
-    return derive_date_columns_from_unix(frame)
+    return derive_date_columns_from_unix(datos)

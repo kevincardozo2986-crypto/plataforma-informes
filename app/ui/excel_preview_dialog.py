@@ -7,12 +7,13 @@ from PySide6.QtWidgets import (
 )
 
 from app.ui.theme import EXCEL_MODULE_STYLESHEET
+from app.ui.window_chrome import preparar_ventana_sin_marco
 
 
 class ExcelPreviewDialog(QDialog):
-    def __init__(self, excel_process, parent=None):
-        super().__init__(parent)
-        self.excel_process = excel_process
+    def __init__(self, proceso_excel, ventana_padre=None):
+        super().__init__(ventana_padre)
+        self.proceso_excel = proceso_excel
         self.setWindowTitle("Vista previa del Excel")
         self.resize(1050, 650)
         self.setObjectName("excelPreviewDialog")
@@ -20,48 +21,57 @@ class ExcelPreviewDialog(QDialog):
         self._build_ui()
 
     def _build_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 22, 24, 20)
-        title = QLabel("Vista previa del Excel")
-        title.setObjectName("excelPageTitle")
-        subtitle = QLabel("Se muestran como máximo 75 registros por hoja; el archivo conserva todos los datos.")
-        subtitle.setObjectName("excelPageSubtitle")
-        self.tabs = QTabWidget()
-        self.tabs.setObjectName("previewTabs")
-        layout.addWidget(title)
-        layout.addWidget(subtitle)
-        layout.addSpacing(10)
-        layout.addWidget(self.tabs, 1)
+        diseno = QVBoxLayout(self)
+        diseno.setContentsMargins(0, 0, 0, 0)
+        diseno.setSpacing(0)
+        diseno.addWidget(
+            preparar_ventana_sin_marco(
+                self, "Vista previa del Excel", controles_completos=True
+            )
+        )
+        contenido = QVBoxLayout()
+        contenido.setContentsMargins(24, 22, 24, 20)
+        titulo = QLabel("Vista previa del Excel")
+        titulo.setObjectName("excelPageTitle")
+        subtitulo = QLabel("Se muestran como máximo 75 registros por hoja; el archivo conserva todos los datos.")
+        subtitulo.setObjectName("excelPageSubtitle")
+        self.pestanas = QTabWidget()
+        self.pestanas.setObjectName("previewTabs")
+        contenido.addWidget(titulo)
+        contenido.addWidget(subtitulo)
+        contenido.addSpacing(10)
+        contenido.addWidget(self.pestanas, 1)
 
-        for sheet_name in self.excel_process.sheet_names():
-            self.tabs.addTab(self._create_sheet_tab(sheet_name), sheet_name)
+        for nombre_hoja in self.proceso_excel.sheet_names():
+            self.pestanas.addTab(self._create_sheet_tab(nombre_hoja), nombre_hoja)
 
-        actions = QHBoxLayout()
-        actions.addStretch()
-        close_button = QPushButton("Cerrar")
-        close_button.setObjectName("secondaryExcelButton")
-        close_button.clicked.connect(self.accept)
-        actions.addWidget(close_button)
-        layout.addLayout(actions)
+        acciones = QHBoxLayout()
+        acciones.addStretch()
+        boton_cerrar = QPushButton("Cerrar")
+        boton_cerrar.setObjectName("secondaryExcelButton")
+        boton_cerrar.clicked.connect(self.accept)
+        acciones.addWidget(boton_cerrar)
+        contenido.addLayout(acciones)
+        diseno.addLayout(contenido, 1)
 
-    def _create_sheet_tab(self, sheet_name):
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        headers, rows, total_rows = self.excel_process.preview_sheet(sheet_name, limit=75)
-        info = QLabel(f"Mostrando {len(rows):,} de {total_rows:,} registros")
-        info.setObjectName("previewInfo")
-        table = QTableWidget(len(rows), len(headers))
-        table.setObjectName("excelPreviewTable")
-        table.setHorizontalHeaderLabels(headers)
-        table.setAlternatingRowColors(True)
-        table.setEditTriggers(QTableWidget.NoEditTriggers)
-        table.setSelectionBehavior(QTableWidget.SelectRows)
-        for row_index, row in enumerate(rows):
-            for column_index, value in enumerate(row):
-                item = QTableWidgetItem("" if value is None else str(value))
-                item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-                table.setItem(row_index, column_index, item)
-        table.resizeColumnsToContents()
-        layout.addWidget(info)
-        layout.addWidget(table, 1)
-        return page
+    def _create_sheet_tab(self, nombre_hoja):
+        pagina = QWidget()
+        diseno = QVBoxLayout(pagina)
+        encabezados, filas, total_filas = self.proceso_excel.preview_sheet(nombre_hoja, limit=75)
+        informacion = QLabel(f"Mostrando {len(filas):,} de {total_filas:,} registros")
+        informacion.setObjectName("previewInfo")
+        tabla = QTableWidget(len(filas), len(encabezados))
+        tabla.setObjectName("excelPreviewTable")
+        tabla.setHorizontalHeaderLabels(encabezados)
+        tabla.setAlternatingRowColors(True)
+        tabla.setEditTriggers(QTableWidget.NoEditTriggers)
+        tabla.setSelectionBehavior(QTableWidget.SelectRows)
+        for indice_fila, fila in enumerate(filas):
+            for indice_columna, valor in enumerate(fila):
+                celda = QTableWidgetItem("" if valor is None else str(valor))
+                celda.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+                tabla.setItem(indice_fila, indice_columna, celda)
+        tabla.resizeColumnsToContents()
+        diseno.addWidget(informacion)
+        diseno.addWidget(tabla, 1)
+        return pagina

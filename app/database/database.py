@@ -13,23 +13,23 @@ DATABASE_PATH = PROJECT_ROOT / "data" / "app.db"
 def get_connection() -> Iterator[sqlite3.Connection]:
     """Abre una conexión y garantiza que se cierre al terminar."""
     DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(DATABASE_PATH)
-    connection.row_factory = sqlite3.Row
-    connection.execute("PRAGMA foreign_keys = ON")
+    conexion = sqlite3.connect(DATABASE_PATH)
+    conexion.row_factory = sqlite3.Row
+    conexion.execute("PRAGMA foreign_keys = ON")
     try:
-        yield connection
-        connection.commit()
+        yield conexion
+        conexion.commit()
     except Exception:
-        connection.rollback()
+        conexion.rollback()
         raise
     finally:
-        connection.close()
+        conexion.close()
 
 
 def initialize_database() -> None:
-    """Crea la tabla de usuarios si todavía no existe."""
-    with get_connection() as connection:
-        connection.execute(
+    """Crea las tablas y opciones iniciales de la aplicación."""
+    with get_connection() as conexion:
+        conexion.execute(
             """
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,3 +43,29 @@ def initialize_database() -> None:
             )
             """
         )
+        conexion.execute(
+            """
+            CREATE TABLE IF NOT EXISTS report_options (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                category TEXT NOT NULL,
+                value TEXT NOT NULL COLLATE NOCASE,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(category, value)
+            )
+            """
+        )
+        opciones_iniciales = {
+            "period": ("2025-1", "2025-2", "2026-1", "2026-2"),
+            "level": ("Pregrado", "Posgrado"),
+            "modality": ("Presencial", "Virtual", "Presencial-Virtual"),
+            "program": (
+                "Ingeniería de Sistemas",
+                "Ingeniería Industrial",
+                "Administración de Empresas",
+            ),
+        }
+        for categoria, valores in opciones_iniciales.items():
+            conexion.executemany(
+                "INSERT OR IGNORE INTO report_options (category, value) VALUES (?, ?)",
+                ((categoria, valor) for valor in valores),
+            )

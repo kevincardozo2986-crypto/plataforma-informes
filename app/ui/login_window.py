@@ -6,6 +6,7 @@ from PySide6.QtWidgets import QFrame, QGraphicsDropShadowEffect, QGridLayout, QH
 
 from app.services.auth_service import authenticate_user
 from app.ui.theme import LOGIN_STYLESHEET
+from app.ui.window_chrome import preparar_ventana_sin_marco
 
 
 def create_eye_icon(password_is_visible):
@@ -72,7 +73,17 @@ class LoginWindow(QWidget):
         self._connect_events()
 
     def _build_ui(self):
-        page_layout = QVBoxLayout(self)
+        diseno_exterior = QVBoxLayout(self)
+        diseno_exterior.setContentsMargins(0, 0, 0, 0)
+        diseno_exterior.setSpacing(0)
+        diseno_exterior.addWidget(
+            preparar_ventana_sin_marco(
+                self, "Plataforma de Informes USTA", controles_completos=True
+            )
+        )
+        contenido = QWidget()
+        contenido.setObjectName("loginContent")
+        page_layout = QVBoxLayout(contenido)
         page_layout.setContentsMargins(48, 36, 48, 36)
         page_layout.setAlignment(Qt.AlignCenter)
 
@@ -92,6 +103,7 @@ class LoginWindow(QWidget):
         card_layout.addWidget(self._create_hero_panel(), 54)
         card_layout.addWidget(self._create_form_panel(), 46)
         page_layout.addWidget(card)
+        diseno_exterior.addWidget(contenido, 1)
 
     def _create_hero_panel(self):
         panel = HeroPanel()

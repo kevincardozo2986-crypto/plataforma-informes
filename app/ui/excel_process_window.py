@@ -5,19 +5,35 @@ from pathlib import Path
 from PySide6.QtCore import QObject, QThread, Qt, Signal, Slot
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
-    QComboBox, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel,
-    QMessageBox, QProgressBar, QPushButton, QScrollArea, QVBoxLayout, QWidget,
+    QComboBox, QDialog, QFileDialog, QFrame, QGridLayout, QHBoxLayout,
+    QLabel, QListWidget, QProgressBar, QPushButton, QScrollArea,
+    QVBoxLayout, QWidget,
 )
 
 from app.services.csv_service import estimate_csv_rows, inspect_csv_structure, iter_csv_chunks
 from app.services.excel_service import ExcelProcess
+from app.services.report_option_service import (
+    add_report_option,
+    delete_report_option,
+    list_report_options,
+    update_report_option,
+)
 from app.services.report_path_service import (
     copy_source_csv,
     create_report_directory,
     prepare_report_paths,
 )
 from app.ui.excel_preview_dialog import ExcelPreviewDialog
+from app.ui.modal_dialogs import (
+    ask_confirmation,
+    ask_text,
+    exec_modal,
+    show_error,
+    show_info,
+    show_warning,
+)
 from app.ui.theme import EXCEL_MODULE_STYLESHEET
+from app.ui.window_chrome import preparar_ventana_sin_marco
 
 
 class BackgroundTask(QObject):
@@ -25,18 +41,18 @@ class BackgroundTask(QObject):
     failed = Signal(str)
     progress = Signal(int)
 
-    def __init__(self, operation):
+    def __init__(self, operacion):
         super().__init__()
-        self.operation = operation
+        self.operacion = operacion
 
     @Slot()
     def run(self):
         try:
-            result = self.operation(self.progress.emit)
-        except Exception as error:
-            self.failed.emit(str(error))
+            resultado = self.operacion(self.progress.emit)
+        except Exception as error_operacion:
+            self.failed.emit(str(error_operacion))
         else:
-            self.finished.emit(result)
+            self.finished.emit(resultado)
 
 
 class ProcessStepRow(QFrame):
@@ -91,11 +107,143 @@ class ProcessStepRow(QFrame):
         self.button.setEnabled(state == "available")
 
 
+class OptionManagementDialog(QDialog):
+    """Ventana exclusiva para administrar los valores de un selector."""
+
+    def __init__(self, usuario_actual, categoria, nombre_visible, parent=None):
+        super().__init__(parent)
+        self.usuario_actual = usuario_actual
+        self.categoria = categoria
+        self.nombre_visible = nombre_visible
+        self.setObjectName("optionManagementDialog")
+        self.setWindowTitle(f"Administrar {nombre_visible}")
+        self.setMinimumSize(440, 390)
+        self._crear_interfaz()
+        self._recargar_lista()
+
+    def _crear_interfaz(self):
+        diseno = QVBoxLayout(self)
+        diseno.setContentsMargins(0, 0, 0, 0)
+        diseno.setSpacing(0)
+        diseno.addWidget(
+            preparar_ventana_sin_marco(
+                self, f"Administrar {self.nombre_visible}", controles_completos=False
+            )
+        )
+        contenido = QVBoxLayout()
+        contenido.setContentsMargins(24, 22, 24, 20)
+        contenido.setSpacing(12)
+
+        titulo = QLabel(f"Administrar {self.nombre_visible}")
+        titulo.setObjectName("optionDialogTitle")
+        ayuda = QLabel(
+            "Agrega, edita o elimina las opciones disponibles para los usuarios."
+        )
+        ayuda.setObjectName("optionDialogHelp")
+        ayuda.setWordWrap(True)
+        self.lista_opciones = QListWidget()
+        self.lista_opciones.setObjectName("optionList")
+
+        acciones = QHBoxLayout()
+        boton_agregar = QPushButton("+  Agregar")
+        boton_agregar.setObjectName("primaryExcelButton")
+        boton_agregar.clicked.connect(self._agregar)
+        boton_editar = QPushButton("Editar")
+        boton_editar.setObjectName("secondaryExcelButton")
+        boton_editar.clicked.connect(self._editar)
+        boton_eliminar = QPushButton("Eliminar")
+        boton_eliminar.setObjectName("dangerOptionButton")
+        boton_eliminar.clicked.connect(self._eliminar)
+        acciones.addWidget(boton_agregar)
+        acciones.addWidget(boton_editar)
+        acciones.addWidget(boton_eliminar)
+
+        boton_cerrar = QPushButton("Cerrar")
+        boton_cerrar.setObjectName("secondaryExcelButton")
+        boton_cerrar.clicked.connect(self.accept)
+        pie = QHBoxLayout()
+        pie.addStretch()
+        pie.addWidget(boton_cerrar)
+
+        contenido.addWidget(titulo)
+        contenido.addWidget(ayuda)
+        contenido.addWidget(self.lista_opciones, 1)
+        contenido.addLayout(acciones)
+        contenido.addLayout(pie)
+        diseno.addLayout(contenido, 1)
+
+    def _recargar_lista(self, seleccionar=None):
+        self.lista_opciones.clear()
+        self.lista_opciones.addItems(list_report_options(self.categoria))
+        if seleccionar:
+            coincidencias = self.lista_opciones.findItems(
+                seleccionar, Qt.MatchFixedString
+            )
+            if coincidencias:
+                self.lista_opciones.setCurrentItem(coincidencias[0])
+        elif self.lista_opciones.count():
+            self.lista_opciones.setCurrentRow(0)
+
+    def _texto_solicitud(self):
+        if self.categoria == "period":
+            return "Periodo con formato AAAA-S (ejemplo: 2026-1):"
+        return f"Nombre de {self.nombre_visible}:"
+
+    def _agregar(self):
+        valor, confirmado = ask_text(
+            self, "Agregar opción", self._texto_solicitud()
+        )
+        if confirmado:
+            try:
+                guardado = add_report_option(
+                    self.usuario_actual, self.categoria, valor
+                )
+                self._recargar_lista(guardado)
+            except (PermissionError, ValueError) as error:
+                show_warning(self, "No se pudo agregar", str(error))
+
+    def _editar(self):
+        elemento = self.lista_opciones.currentItem()
+        if not elemento:
+            return
+        valor_actual = elemento.text()
+        valor_nuevo, confirmado = ask_text(
+            self, "Editar opción", self._texto_solicitud(), valor_actual
+        )
+        if confirmado:
+            try:
+                guardado = update_report_option(
+                    self.usuario_actual, self.categoria, valor_actual, valor_nuevo
+                )
+                self._recargar_lista(guardado)
+            except (PermissionError, ValueError) as error:
+                show_warning(self, "No se pudo editar", str(error))
+
+    def _eliminar(self):
+        elemento = self.lista_opciones.currentItem()
+        if not elemento:
+            return
+        valor = elemento.text()
+        confirmado = ask_confirmation(
+            self,
+            "Eliminar opción",
+            f'¿Deseas eliminar "{valor}"?',
+        )
+        if not confirmado:
+            return
+        try:
+            delete_report_option(self.usuario_actual, self.categoria, valor)
+            self._recargar_lista()
+        except (PermissionError, ValueError) as error:
+            show_warning(self, "No se pudo eliminar", str(error))
+
+
 class ExcelProcessWindow(QWidget):
     back_requested = Signal()
 
-    def __init__(self):
+    def __init__(self, usuario_actual):
         super().__init__()
+        self.usuario_actual = usuario_actual
         self.setObjectName("excelProcessPage")
         self.excel_process = ExcelProcess()
         self.csv_path = None
@@ -108,9 +256,22 @@ class ExcelProcessWindow(QWidget):
         self._build_ui()
 
     def _build_ui(self):
-        root = QVBoxLayout(self)
+        diseno_exterior = QVBoxLayout(self)
+        diseno_exterior.setContentsMargins(0, 0, 0, 0)
+
+        desplazamiento_principal = QScrollArea()
+        desplazamiento_principal.setObjectName("excelMainScroll")
+        desplazamiento_principal.setWidgetResizable(True)
+        desplazamiento_principal.setFrameShape(QFrame.NoFrame)
+        desplazamiento_principal.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
+        contenido = QWidget()
+        contenido.setObjectName("excelScrollableContent")
+        root = QVBoxLayout(contenido)
         root.setContentsMargins(34, 24, 34, 24)
         root.setSpacing(13)
+        desplazamiento_principal.setWidget(contenido)
+        diseno_exterior.addWidget(desplazamiento_principal)
         top = QHBoxLayout()
         back = QPushButton("←  Volver al dashboard")
         back.setObjectName("excelBackButton")
@@ -150,97 +311,103 @@ class ExcelProcessWindow(QWidget):
 
         root.addWidget(self._section_header(1, "Configuración del informe"))
 
-        setup = QFrame()
-        setup.setObjectName("excelSetupCard")
-        grid = QGridLayout(setup)
-        grid.setContentsMargins(18, 15, 18, 15)
-        grid.setHorizontalSpacing(14)
-        self.period = QComboBox()
-        self.period.addItems(["2025-1", "2025-2", "2026-1", "2026-2"])
+        configuracion = QFrame()
+        configuracion.setObjectName("excelSetupCard")
+        grid = QGridLayout(configuracion)
+        grid.setContentsMargins(4, 4, 4, 8)
+        grid.setHorizontalSpacing(18)
+        grid.setVerticalSpacing(7)
+        self.period = self._crear_lista_opciones("period")
         self.period.setCurrentText("2026-1")
-        self.level = QComboBox()
-        self.level.addItems(["Pregrado", "Posgrado"])
-        self.modality = QComboBox()
-        self.modality.addItems(["Presencial", "Virtual", "Presencial-Virtual"])
-        self.program = QComboBox()
-        self.program.setEditable(True)
-        self.program.addItems(["Ingeniería de Sistemas", "Ingeniería Industrial", "Administración de Empresas"])
+        self.level = self._crear_lista_opciones("level")
+        self.modality = self._crear_lista_opciones("modality")
+        self.program = self._crear_lista_opciones("program")
+
+        campos = (
+            ("01", "Periodo académico", self.period, "period"),
+            ("02", "Nivel académico", self.level, "level"),
+            ("03", "Modalidad", self.modality, "modality"),
+            ("04", "Programa", self.program, "program"),
+        )
+        for columna, (numero, nombre, selector, categoria) in enumerate(campos):
+            etiqueta = QLabel(f"{numero}   {nombre.upper()}")
+            etiqueta.setObjectName("sequenceFieldLabel")
+            grid.addWidget(etiqueta, 0, columna)
+            grid.addLayout(
+                self._crear_fila_selector(selector, categoria, nombre.lower()),
+                1,
+                columna,
+            )
+            grid.setColumnStretch(columna, 1)
+
+        self.configuration_summary = QLabel()
+        self.configuration_summary.setObjectName("configurationSummary")
+        grid.addWidget(self.configuration_summary, 2, 0, 1, 4)
+        root.addWidget(configuracion)
+
+        archivos = QFrame()
+        archivos.setObjectName("sourceFilesPanel")
+        archivos_grid = QGridLayout(archivos)
+        archivos_grid.setContentsMargins(16, 12, 16, 13)
+        archivos_grid.setHorizontalSpacing(14)
+        archivos_grid.setVerticalSpacing(7)
+
+        titulo_archivos = QLabel("ARCHIVOS DE ORIGEN")
+        titulo_archivos.setObjectName("sourceFilesTitle")
+        archivos_grid.addWidget(titulo_archivos, 0, 0, 1, 3)
+
         self.file_label = QLabel("Ningún archivo seleccionado")
         self.file_label.setObjectName("selectedCsvLabel")
-        select = QPushButton("Seleccionar archivo")
+        select = QPushButton("Examinar")
         select.setObjectName("secondaryExcelButton")
         select.clicked.connect(self._select_csv)
         self.base_label = QLabel("Ninguna carpeta base seleccionada")
         self.base_label.setObjectName("selectedCsvLabel")
-        select_base = QPushButton("Seleccionar carpeta base")
+        select_base = QPushButton("Seleccionar carpeta")
         select_base.setObjectName("secondaryExcelButton")
         select_base.clicked.connect(self._select_base_directory)
-        self.load_button = QPushButton("Cargar CSV")
+        self.load_button = QPushButton("↑  CARGAR CSV")
         self.load_button.setObjectName("primaryExcelButton")
+        self.load_button.setFixedWidth(190)
         self.load_button.setEnabled(False)
         self.load_button.clicked.connect(self._load_csv)
-        period_label = QLabel("Periodo académico")
-        period_label.setObjectName("excelFieldLabel")
-        program_label = QLabel("Programa")
-        program_label.setObjectName("excelFieldLabel")
-        level_label = QLabel("Nivel académico")
-        level_label.setObjectName("excelFieldLabel")
-        modality_label = QLabel("Modalidad")
-        modality_label.setObjectName("excelFieldLabel")
+
         base_field_label = QLabel("Carpeta base")
         base_field_label.setObjectName("excelFieldLabel")
         file_field_label = QLabel("Archivo CSV")
         file_field_label.setObjectName("excelFieldLabel")
-        grid.addWidget(period_label, 0, 0)
-        grid.addWidget(level_label, 0, 1)
-        grid.addWidget(modality_label, 0, 2)
-        grid.addWidget(program_label, 0, 3)
-        grid.addWidget(self.period, 1, 0)
-        grid.addWidget(self.level, 1, 1)
-        grid.addWidget(self.modality, 1, 2)
-        grid.addWidget(self.program, 1, 3)
-        grid.addWidget(base_field_label, 2, 0, 1, 2)
-        grid.addWidget(file_field_label, 2, 2, 1, 2)
+
         base_row = QHBoxLayout()
         base_row.addWidget(self.base_label, 1)
         base_row.addWidget(select_base)
-        grid.addLayout(base_row, 3, 0, 1, 2)
         file_row = QHBoxLayout()
         file_row.addWidget(self.file_label, 1)
         file_row.addWidget(select)
-        grid.addLayout(file_row, 3, 2)
-        grid.addWidget(self.load_button, 3, 3)
-        grid.setColumnStretch(0, 1)
-        grid.setColumnStretch(1, 1)
-        grid.setColumnStretch(2, 1)
-        grid.setColumnStretch(3, 1)
-        root.addWidget(setup)
 
-        destination = QFrame()
-        destination.setObjectName("destinationPreview")
-        destination_layout = QVBoxLayout(destination)
-        destination_layout.setContentsMargins(15, 10, 15, 10)
-        destination_title = QLabel("Ruta institucional de destino")
+        archivos_grid.addWidget(base_field_label, 1, 0)
+        archivos_grid.addWidget(file_field_label, 1, 1)
+        archivos_grid.addLayout(base_row, 2, 0)
+        archivos_grid.addLayout(file_row, 2, 1)
+        archivos_grid.addWidget(self.load_button, 2, 2, alignment=Qt.AlignBottom)
+        archivos_grid.setColumnStretch(0, 1)
+        archivos_grid.setColumnStretch(1, 1)
+
+        destination_title = QLabel("Ruta generada")
         destination_title.setObjectName("destinationTitle")
         self.destination_label = QLabel("Selecciona una carpeta base para construir la ruta institucional.")
         self.destination_label.setObjectName("destinationPath")
         self.destination_label.setWordWrap(True)
-        destination_header = QHBoxLayout()
-        destination_number = QLabel("2")
-        destination_number.setObjectName("sectionNumber")
-        destination_number.setAlignment(Qt.AlignCenter)
-        destination_number.setFixedSize(30, 30)
-        destination_header.addWidget(destination_number)
-        destination_header.addWidget(destination_title)
-        destination_header.addStretch()
-        destination_layout.addLayout(destination_header)
-        destination_layout.addWidget(self.destination_label)
-        root.addWidget(destination)
+        archivos_grid.addWidget(destination_title, 3, 0, 1, 3)
+        archivos_grid.addWidget(self.destination_label, 4, 0, 1, 3)
+        root.addWidget(archivos)
 
         for combo in (self.period, self.level, self.modality, self.program):
             combo.currentTextChanged.connect(self._update_destination)
+            combo.currentTextChanged.connect(self._actualizar_resumen_configuracion)
 
-        root.addWidget(self._section_header(3, "Flujo de procesamiento"))
+        self._actualizar_resumen_configuracion()
+
+        root.addWidget(self._section_header(2, "Flujo de procesamiento"))
 
         columns_header = QFrame()
         columns_header.setObjectName("stepsColumnsHeader")
@@ -264,13 +431,18 @@ class ExcelProcessWindow(QWidget):
         scroll = QScrollArea()
         scroll.setObjectName("excelStepsScroll")
         scroll.setWidgetResizable(True)
-        scroll.setFixedHeight(176)
+        scroll.setFixedHeight(245)
         steps_page = QWidget()
         steps_layout = QVBoxLayout(steps_page)
         steps_layout.setContentsMargins(0, 0, 8, 0)
         definitions = (
             ("Crear hoja Original", "Copia todos los datos del CSV sin transformarlos.", True),
             ("Convertir FechaUnix", "Agrega Fecha, Mes y Dia junto a FechaUnix en Original.", True),
+            (
+                "Crear Tabla Docentes",
+                "Cuenta días distintos por curso, docente y mes.",
+                True,
+            ),
         )
         for number, (name, description, executable) in enumerate(definitions, 1):
             step = ProcessStepRow(number, name, description, executable)
@@ -278,6 +450,7 @@ class ExcelProcessWindow(QWidget):
             steps_layout.addWidget(step)
         self.steps[0].requested.connect(self._create_original)
         self.steps[1].requested.connect(self._prepare_information)
+        self.steps[2].requested.connect(self._crear_tabla_docentes)
         steps_layout.addStretch()
         scroll.setWidget(steps_page)
         root.addWidget(scroll)
@@ -311,6 +484,60 @@ class ExcelProcessWindow(QWidget):
         actions.addWidget(self.save_button)
         root.addLayout(actions)
 
+    def _crear_lista_opciones(self, categoria):
+        """Crea una lista cerrada con las opciones guardadas en la base de datos."""
+        lista = QComboBox()
+        lista.setEditable(False)
+        lista.addItems(list_report_options(categoria))
+        return lista
+
+    def _crear_fila_selector(self, lista, categoria, nombre_visible):
+        """Añade un acceso discreto a la administración de la lista."""
+        fila = QHBoxLayout()
+        fila.setContentsMargins(0, 0, 0, 0)
+        fila.setSpacing(6)
+        fila.addWidget(lista, 1)
+
+        if self.usuario_actual.get("role") == "admin":
+            boton_agregar = QPushButton("+")
+            boton_agregar.setObjectName("addOptionButton")
+            boton_agregar.setToolTip(f"Administrar {nombre_visible}")
+            boton_agregar.setCursor(Qt.PointingHandCursor)
+            boton_agregar.setAccessibleName(f"Administrar {nombre_visible}")
+            boton_agregar.setFixedSize(30, 30)
+            boton_agregar.clicked.connect(
+                lambda: self._abrir_administracion(
+                    lista, categoria, nombre_visible
+                )
+            )
+            fila.addWidget(boton_agregar)
+        return fila
+
+    def _abrir_administracion(self, lista, categoria, nombre_visible):
+        """Abre el CRUD en una ventana aparte y refresca el selector al cerrar."""
+        valor_anterior = lista.currentText()
+        ventana = OptionManagementDialog(
+            self.usuario_actual, categoria, nombre_visible, self
+        )
+        exec_modal(ventana)
+        valor_dialogo = (
+            ventana.lista_opciones.currentItem().text()
+            if ventana.lista_opciones.currentItem()
+            else valor_anterior
+        )
+        lista.clear()
+        lista.addItems(list_report_options(categoria))
+        lista.setCurrentText(valor_dialogo)
+        self._update_destination()
+
+    def _actualizar_resumen_configuracion(self):
+        """Explica visualmente cómo se combinarán los cuatro selectores."""
+        resumen = "  /  ".join(
+            selector.currentText()
+            for selector in (self.period, self.level, self.modality, self.program)
+        )
+        self.configuration_summary.setText(resumen)
+
     def _section_header(self, number, title):
         header = QFrame()
         header.setObjectName("excelSectionHeader")
@@ -328,20 +555,30 @@ class ExcelProcessWindow(QWidget):
         return header
 
     def _select_csv(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Seleccionar CSV de Moodle", "", "Archivos CSV (*.csv)")
-        if path:
-            self.csv_path = path
-            self.file_label.setText(Path(path).name)
-            self.file_label.setToolTip(path)
-            self._update_destination()
+        ruta_archivo, filtro_seleccionado = QFileDialog.getOpenFileName(
+            self, "Seleccionar CSV de Moodle", "", "Archivos CSV (*.csv)"
+        )
+        if not ruta_archivo:
+            return
+
+        ruta_csv = Path(ruta_archivo)
+        self.csv_path = ruta_csv
+        self.file_label.setText(ruta_csv.name)
+        self.file_label.setToolTip(str(ruta_csv))
+        self._actualizar_estado_boton_carga(False)
+        self._update_destination()
 
     def _select_base_directory(self):
-        path = QFileDialog.getExistingDirectory(self, "Seleccionar carpeta base de informes")
-        if path:
-            self.base_directory = path
-            self.base_label.setText(path)
-            self.base_label.setToolTip(path)
-            self._update_destination()
+        ruta_carpeta = QFileDialog.getExistingDirectory(
+            self, "Seleccionar carpeta base de informes"
+        )
+        if not ruta_carpeta:
+            return
+
+        self.base_directory = ruta_carpeta
+        self.base_label.setText(ruta_carpeta)
+        self.base_label.setToolTip(ruta_carpeta)
+        self._update_destination()
 
     def _update_destination(self):
         self.report_paths = None
@@ -350,14 +587,14 @@ class ExcelProcessWindow(QWidget):
             self.load_button.setEnabled(False)
             return
         try:
-            source_name = self.csv_path or "Informe_Moodle.csv"
+            nombre_archivo_origen = self.csv_path or "Informe_Moodle.csv"
             self.report_paths = prepare_report_paths(
                 self.base_directory,
                 self.period.currentText(),
                 self.level.currentText(),
                 self.modality.currentText(),
                 self.program.currentText(),
-                source_name,
+                nombre_archivo_origen,
             )
         except ValueError as error:
             self.destination_label.setText(str(error))
@@ -370,22 +607,20 @@ class ExcelProcessWindow(QWidget):
         self._update_destination()
         if not self.report_paths or not self.csv_path:
             return
-        overwrite_csv = False
+        reemplazar_csv = False
         if self.report_paths.source_csv.exists():
-            answer = QMessageBox.question(
+            confirmado = ask_confirmation(
                 self,
                 "El CSV ya existe",
                 f"Ya existe {self.report_paths.source_csv.name} en la carpeta del informe.\n\n¿Deseas reemplazar la copia existente?",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No,
             )
-            if answer != QMessageBox.Yes:
+            if not confirmado:
                 return
-            overwrite_csv = True
-        paths = self.report_paths
-        source_csv = self.csv_path
+            reemplazar_csv = True
+        rutas_informe = self.report_paths
+        ruta_csv_origen = self.csv_path
         self.excel_process = ExcelProcess()
-        academic_data = (
+        datos_academicos = (
             self.base_directory,
             self.period.currentText(),
             self.level.currentText(),
@@ -394,40 +629,53 @@ class ExcelProcessWindow(QWidget):
         )
         self.steps[0].set_state("pending")
         self._start_background(
-            lambda progress: self._validate_and_copy_csv(
-                source_csv, paths, overwrite_csv, academic_data, progress
+            lambda progreso: self._validate_and_copy_csv(
+                ruta_csv_origen, rutas_informe, reemplazar_csv, datos_academicos, progreso
             ),
             self._csv_loaded,
             lambda message: self._task_failed(0, "Error al cargar el CSV", message),
         )
 
-    def _validate_and_copy_csv(self, source_csv, paths, overwrite_csv, academic_data, progress):
-        progress(10)
-        columns = inspect_csv_structure(source_csv)
-        progress(30)
-        create_report_directory(*academic_data)
-        progress(45)
+    def _validate_and_copy_csv(
+        self, ruta_csv_origen, rutas_informe, reemplazar_csv, datos_academicos, informar_progreso
+    ):
+        informar_progreso(10)
+        columnas = inspect_csv_structure(ruta_csv_origen)
+        informar_progreso(30)
+        create_report_directory(*datos_academicos)
+        informar_progreso(45)
         copy_source_csv(
-            source_csv,
-            paths.source_csv,
-            overwrite=overwrite_csv,
-            progress_callback=progress,
+            ruta_csv_origen,
+            rutas_informe.source_csv,
+            overwrite=reemplazar_csv,
+            progress_callback=informar_progreso,
         )
-        return len(columns), paths
+        return len(columnas), rutas_informe
 
-    def _csv_loaded(self, result):
-        columns, self.report_paths = result
+    def _csv_loaded(self, resultado_carga):
+        cantidad_columnas, self.report_paths = resultado_carga
+        self._actualizar_estado_boton_carga(True)
         self.steps[0].set_state("available")
         self.steps[1].set_state("pending")
+        self.steps[2].set_state("pending")
         self.preview_button.setEnabled(False)
         self.save_button.setEnabled(False)
         self.feedback.setText(
-            f"CSV cargado y validado: {columns} columnas. Ejecuta el paso 1 para crear Original."
+            f"CSV cargado y validado: {cantidad_columnas} columnas. Ejecuta el paso 1 para crear Original."
         )
+
+    def _actualizar_estado_boton_carga(self, cargado):
+        """Diferencia visualmente un CSV pendiente de uno ya cargado."""
+        self.load_button.setText("✓  CSV CARGADO" if cargado else "↑  CARGAR CSV")
+        self.load_button.setObjectName(
+            "loadedCsvButton" if cargado else "primaryExcelButton"
+        )
+        self.load_button.style().unpolish(self.load_button)
+        self.load_button.style().polish(self.load_button)
 
     def _task_failed(self, step_index, title, message):
         self.steps[step_index].set_state("error", "No se pudo completar")
-        QMessageBox.critical(self, title, message)
+        show_error(self, title, message)
 
     def _start_background(self, operation, on_success, on_error):
         if self._thread and self._thread.isRunning():
@@ -459,9 +707,9 @@ class ExcelProcessWindow(QWidget):
         self._worker = None
         self._thread = None
         self.load_button.setEnabled(bool(self.csv_path and self.base_directory))
-        available = self.excel_process.exists
-        self.preview_button.setEnabled(available)
-        self.save_button.setEnabled(available)
+        excel_disponible = self.excel_process.exists
+        self.preview_button.setEnabled(excel_disponible)
+        self.save_button.setEnabled(excel_disponible)
 
     def _prepare_information(self):
         self.steps[1].set_state("available", "Procesando…")
@@ -481,53 +729,78 @@ class ExcelProcessWindow(QWidget):
 
     def _write_original(self, prepare, progress):
         progress(2)
-        total_rows = estimate_csv_rows(self.csv_path)
+        total_filas = estimate_csv_rows(self.csv_path)
         return self.excel_process.create_original_from_chunks(
             iter_csv_chunks(self.csv_path, prepare=prepare),
-            total_rows=total_rows,
+            total_rows=total_filas,
             progress_callback=progress,
         )
 
-    def _original_created(self, result):
-        rows, columns = result
+    def _original_created(self, resultado_creacion):
+        cantidad_filas, cantidad_columnas = resultado_creacion
         self.steps[0].set_state("completed")
         self.steps[1].set_state("available")
+        self.steps[2].set_state("pending")
         self.preview_button.setEnabled(True)
         self.save_button.setEnabled(True)
         self.feedback.setText(
-            f"Hoja Original creada: {rows:,} registros y {columns} columnas."
+            f"Hoja Original creada: {cantidad_filas:,} registros y {cantidad_columnas} columnas."
         )
 
-    def _information_prepared(self, result):
-        rows, columns = result
+    def _information_prepared(self, resultado_preparacion):
+        cantidad_filas, cantidad_columnas = resultado_preparacion
         self.steps[1].set_state("completed")
+        self.steps[2].set_state("available")
         self.preview_button.setEnabled(True)
         self.save_button.setEnabled(True)
         self.feedback.setText(
-            f"FechaUnix convertida: se actualizaron {rows:,} registros en la hoja Original."
+            f"FechaUnix convertida: se actualizaron {cantidad_filas:,} registros en la hoja Original."
+        )
+
+    def _crear_tabla_docentes(self):
+        self.steps[2].set_state("available", "Procesando…")
+        self._start_background(
+            lambda progreso: self.excel_process.crear_tabla_docentes(progreso),
+            self._tabla_docentes_creada,
+            lambda mensaje: self._task_failed(
+                2, "Error al crear Tabla Dinamica Docentes", mensaje
+            ),
+        )
+
+    def _tabla_docentes_creada(self, resultado):
+        cantidad_filas, meses = resultado
+        self.steps[2].set_state("completed")
+        self.preview_button.setEnabled(True)
+        self.save_button.setEnabled(True)
+        self.feedback.setText(
+            f"Tabla Dinamica Docentes creada: {cantidad_filas:,} filas; "
+            f"meses: {', '.join(meses)}."
         )
 
     def _preview(self):
-        ExcelPreviewDialog(self.excel_process, self).exec()
+        exec_modal(ExcelPreviewDialog(self.excel_process, self))
 
     def _save(self):
         if not self.report_paths:
             return
         destination = self.report_paths.excel
         if destination.exists():
-            answer = QMessageBox.question(
+            confirmado = ask_confirmation(
                 self,
                 "El Excel ya existe",
                 f"Ya existe {destination.name}.\n\n¿Deseas reemplazarlo?",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No,
             )
-            if answer != QMessageBox.Yes:
+            if not confirmado:
                 return
         try:
             self.excel_process.save_as(destination)
         except OSError as error:
-            QMessageBox.critical(self, "No se pudo guardar", str(error))
+            show_error(self, "No se pudo guardar", str(error))
             return
         self.feedback.setText(f"Excel guardado en {destination}")
-        QMessageBox.information(self, "Excel guardado", "El archivo se guardó correctamente.")
+        show_info(
+            self,
+            "Excel guardado",
+            "El archivo se guardó correctamente.",
+            success=True,
+        )

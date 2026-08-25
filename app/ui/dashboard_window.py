@@ -3,18 +3,24 @@ from pathlib import Path
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
+    QFileDialog,
     QFrame,
     QGraphicsDropShadowEffect,
     QHBoxLayout,
     QLabel,
+    QListWidget,
     QMainWindow,
     QPushButton,
-    QStackedWidget,
     QVBoxLayout,
+    QStackedWidget,
     QWidget,
 )
 
 from app.ui.theme import DASHBOARD_STYLESHEET
+from app.ui.modal_dialogs import MODAL_STYLE, exec_modal
+from app.ui.window_chrome import preparar_ventana_sin_marco
 from app.ui.excel_process_window import ExcelProcessWindow
 from app.ui.users_window import UsersPage
 
@@ -98,6 +104,38 @@ class ProcessCard(QFrame):
         layout.addWidget(button)
 
 
+class ModuleDialog(QDialog):
+    """Diálogo sencillo para los módulos que todavía no tienen una página propia."""
+
+    def __init__(self, title, description, parent=None):
+        super().__init__(parent)
+        self.setObjectName("institutionalDialog")
+        self.setStyleSheet(MODAL_STYLE)
+        self.setWindowTitle(title)
+        self.setMinimumSize(480, 260)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(preparar_ventana_sin_marco(self, title, False))
+        content = QVBoxLayout()
+        content.setContentsMargins(24, 22, 24, 20)
+        content.setSpacing(14)
+
+        heading = QLabel(title)
+        heading.setStyleSheet("font-size: 18px; font-weight: 700; color: #071D38;")
+        body = QLabel(description)
+        body.setWordWrap(True)
+        body.setStyleSheet("color: #526A82; font-size: 12px;")
+        content.addWidget(heading)
+        content.addWidget(body)
+        content.addStretch()
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Close)
+        buttons.rejected.connect(self.reject)
+        content.addWidget(buttons)
+        layout.addLayout(content, 1)
+
+
 class DashboardWindow(QMainWindow):
     logout_requested = Signal()
     excel_requested = Signal()
@@ -112,7 +150,7 @@ class DashboardWindow(QMainWindow):
         self.stack = QStackedWidget()
         self.home_page = self._create_home_page()
         self.stack.addWidget(self.home_page)
-        self.excel_page = ExcelProcessWindow()
+        self.excel_page = ExcelProcessWindow(user)
         self.excel_page.back_requested.connect(self._show_dashboard)
         self.stack.addWidget(self.excel_page)
         self.excel_requested.connect(self._open_excel)
@@ -120,7 +158,17 @@ class DashboardWindow(QMainWindow):
             self.users_page = UsersPage(user)
             self.users_page.back_requested.connect(self._show_dashboard)
             self.stack.addWidget(self.users_page)
-        self.setCentralWidget(self.stack)
+        contenedor = QWidget()
+        diseno_ventana = QVBoxLayout(contenedor)
+        diseno_ventana.setContentsMargins(0, 0, 0, 0)
+        diseno_ventana.setSpacing(0)
+        diseno_ventana.addWidget(
+            preparar_ventana_sin_marco(
+                self, "Plataforma de Informes USTA", controles_completos=True
+            )
+        )
+        diseno_ventana.addWidget(self.stack, 1)
+        self.setCentralWidget(contenedor)
         self.setStyleSheet(DASHBOARD_STYLESHEET)
 
     def _create_home_page(self):
@@ -160,11 +208,11 @@ class DashboardWindow(QMainWindow):
         layout.addSpacing(18)
         nav = [
             ("Procesos", "history.svg", self._show_dashboard, True),
-            ("Informes", "document.svg", self.report_requested.emit, False),
-            ("Historial", "history.svg", self.history_requested.emit, False),
+            ("Informes", "document.svg", self._open_reports, False),
+            ("Historial", "history.svg", self._open_history, False),
             ("Plantillas", "excel.svg", self.excel_requested.emit, False),
-            ("Configuración", "edit.svg", None, False),
-            ("Ayuda", "users.svg", None, False),
+            ("Configuración", "edit.svg", self._open_configuration, False),
+            ("Ayuda", "users.svg", self._open_help, False),
         ]
         for text, icon, callback, active in nav:
             button = self._nav(text, icon, active)
@@ -218,8 +266,8 @@ class DashboardWindow(QMainWindow):
         cards.setSpacing(26)
         data = [
             (1, "process-excel.png", "card-excel-scene.png", "Preparar Excel", "Organiza y valida la información exportada desde Moodle.", self.excel_requested.emit),
-            (2, "process-report.png", "card-report-scene.png", "Crear informe", "Convierte el Excel en el documento institucional.", self.report_requested.emit),
-            (3, "process-history.png", "card-history-scene.png", "Consultar historial", "Encuentra rápidamente los informes anteriores.", self.history_requested.emit),
+            (2, "process-report.png", "card-report-scene.png", "Crear informe", "Convierte el Excel en el documento institucional.", self._open_reports),
+            (3, "process-history.png", "card-history-scene.png", "Consultar historial", "Encuentra rápidamente los informes anteriores.", self._open_history),
         ]
         for number, icon, decoration, title, body, callback in data:
             card = ProcessCard(number, icon, decoration, title, body)
@@ -236,6 +284,101 @@ class DashboardWindow(QMainWindow):
 
     def _open_excel(self):
         self.stack.setCurrentWidget(self.excel_page)
+
+    def _open_reports(self):
+        """Abre el flujo disponible para preparar un nuevo informe."""
+        self.stack.setCurrentWidget(self.excel_page)
+
+    def _open_history(self):
+        carpeta = QFileDialog.getExistingDirectory(
+            self, "Seleccionar carpeta donde buscar informes"
+        )
+        if not carpeta:
+            return
+
+        archivos = sorted(Path(carpeta).rglob("*.xlsx"))
+        dialog = QDialog(self)
+        dialog.setObjectName("institutionalDialog")
+        dialog.setStyleSheet(MODAL_STYLE)
+        dialog.setWindowTitle("Historial de informes")
+        dialog.setMinimumSize(620, 400)
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(preparar_ventana_sin_marco(dialog, "Historial de informes", False))
+        content = QVBoxLayout()
+        content.setContentsMargins(24, 22, 24, 20)
+        content.setSpacing(12)
+        title = QLabel("Informes encontrados")
+        title.setStyleSheet("font-size: 18px; font-weight: 700; color: #071D38;")
+        content.addWidget(title)
+        results = QListWidget()
+        results.addItems([str(archivo) for archivo in archivos])
+        if not archivos:
+            results.addItem("No se encontraron archivos Excel en esta carpeta.")
+        content.addWidget(results)
+        buttons = QDialogButtonBox(QDialogButtonBox.Close)
+        buttons.rejected.connect(dialog.reject)
+        content.addWidget(buttons)
+        layout.addLayout(content, 1)
+        exec_modal(dialog)
+
+    def _open_configuration(self):
+        dialog = QDialog(self)
+        dialog.setObjectName("institutionalDialog")
+        dialog.setStyleSheet(MODAL_STYLE)
+        dialog.setWindowTitle("Configuración")
+        dialog.setMinimumSize(520, 280)
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(preparar_ventana_sin_marco(dialog, "Configuración", False))
+        content = QVBoxLayout()
+        content.setContentsMargins(24, 22, 24, 20)
+        content.setSpacing(12)
+        title = QLabel("Configuración de informes")
+        title.setStyleSheet("font-size: 18px; font-weight: 700; color: #071D38;")
+        content.addWidget(title)
+        description = QLabel(
+            "Define la carpeta base que se usará al preparar informes. "
+            "Esta configuración se aplica a la sesión actual."
+        )
+        description.setWordWrap(True)
+        content.addWidget(description)
+        folder = QLabel(self.excel_page.base_directory or "No seleccionada")
+        folder.setWordWrap(True)
+        content.addWidget(folder)
+        choose = QPushButton("Seleccionar carpeta base")
+        choose.clicked.connect(lambda: self._choose_base_directory(folder))
+        content.addWidget(choose)
+        content.addStretch()
+        buttons = QDialogButtonBox(QDialogButtonBox.Close)
+        buttons.rejected.connect(dialog.reject)
+        content.addWidget(buttons)
+        layout.addLayout(content, 1)
+        exec_modal(dialog)
+
+    def _choose_base_directory(self, label):
+        carpeta = QFileDialog.getExistingDirectory(self, "Seleccionar carpeta base")
+        if not carpeta:
+            return
+        self.excel_page.base_directory = carpeta
+        self.excel_page.base_label.setText(carpeta)
+        self.excel_page.base_label.setToolTip(carpeta)
+        self.excel_page._update_destination()
+        label.setText(carpeta)
+
+    def _open_help(self):
+        exec_modal(
+            ModuleDialog(
+                "Ayuda",
+                "1. En Informes selecciona el CSV exportado desde Moodle.\n"
+                "2. Elige la carpeta base y completa la configuración académica.\n"
+                "3. Ejecuta los pasos disponibles para crear el archivo Excel.\n"
+                "4. Usa Historial para consultar los archivos .xlsx guardados.",
+                self,
+            )
+        )
 
     def _show_dashboard(self):
         self.stack.setCurrentWidget(self.home_page)

@@ -1,10 +1,10 @@
-def user_to_dict(database_row):
+def user_to_dict(fila_base_datos):
     """Convierte una fila de SQLite en datos seguros para la interfaz."""
     return {
-        "id": database_row["id"],
-        "username": database_row["username"],
-        "full_name": database_row["full_name"],
-        "role": database_row["role"],
-        "is_active": bool(database_row["is_active"]),
-        "created_at": database_row["created_at"],
+        "id": fila_base_datos["id"],
+        "username": fila_base_datos["username"],
+        "full_name": fila_base_datos["full_name"],
+        "role": fila_base_datos["role"],
+        "is_active": bool(fila_base_datos["is_active"]),
+        "created_at": fila_base_datos["created_at"],
     }

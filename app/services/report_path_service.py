@@ -27,33 +27,33 @@ class ReportPaths:
 
 def sanitize_name(value, uppercase=False):
     """Conserva nombres legibles y elimina caracteres inválidos en Windows."""
-    cleaned = INVALID_WINDOWS_CHARS.sub("-", str(value or "").strip())
-    cleaned = re.sub(r"\s+", " ", cleaned).rstrip(". ")
-    if not cleaned:
+    nombre_limpio = INVALID_WINDOWS_CHARS.sub("-", str(value or "").strip())
+    nombre_limpio = re.sub(r"\s+", " ", nombre_limpio).rstrip(". ")
+    if not nombre_limpio:
         raise ValueError("El nombre no puede estar vacío.")
-    if cleaned.upper() in RESERVED_WINDOWS_NAMES:
-        cleaned = f"_{cleaned}"
-    return cleaned.upper() if uppercase else cleaned
+    if nombre_limpio.upper() in RESERVED_WINDOWS_NAMES:
+        nombre_limpio = f"_{nombre_limpio}"
+    return nombre_limpio.upper() if uppercase else nombre_limpio
 
 
 def build_report_directory(base_directory, period, level, modality, program):
-    base = Path(base_directory).expanduser()
+    carpeta_base = Path(base_directory).expanduser()
     if not str(base_directory).strip():
         raise ValueError("Selecciona una carpeta base.")
     if level not in VALID_LEVELS:
         raise ValueError("El nivel académico no es válido.")
     if modality not in VALID_MODALITIES:
         raise ValueError("La modalidad no es válida.")
-    safe_period = sanitize_name(period)
-    safe_program = sanitize_name(program, uppercase=True)
-    category = f"{sanitize_name(level)}_{sanitize_name(modality)}"
-    return base / f"INFORMES USO PLATAFORMA {safe_period}" / category / safe_program
+    periodo_seguro = sanitize_name(period)
+    programa_seguro = sanitize_name(program, uppercase=True)
+    categoria = f"{sanitize_name(level)}_{sanitize_name(modality)}"
+    return carpeta_base / f"INFORMES USO PLATAFORMA {periodo_seguro}" / categoria / programa_seguro
 
 
 def create_report_directory(*args, **kwargs):
-    directory = build_report_directory(*args, **kwargs)
-    directory.mkdir(parents=True, exist_ok=True)
-    return directory
+    carpeta_informe = build_report_directory(*args, **kwargs)
+    carpeta_informe.mkdir(parents=True, exist_ok=True)
+    return carpeta_informe
 
 
 def build_excel_path(directory, period):
@@ -61,48 +61,48 @@ def build_excel_path(directory, period):
 
 
 def build_word_path(directory, period, program_code):
-    code = sanitize_name(program_code, uppercase=True).replace(" ", "_")
-    return Path(directory) / f"Informe_{sanitize_name(period)}_{code}.docx"
+    codigo_programa = sanitize_name(program_code, uppercase=True).replace(" ", "_")
+    return Path(directory) / f"Informe_{sanitize_name(period)}_{codigo_programa}.docx"
 
 
 def build_pdf_path(directory, period, program_code):
-    code = sanitize_name(program_code, uppercase=True).replace(" ", "_")
-    return Path(directory) / f"Informe_{sanitize_name(period)}_{code}.pdf"
+    codigo_programa = sanitize_name(program_code, uppercase=True).replace(" ", "_")
+    return Path(directory) / f"Informe_{sanitize_name(period)}_{codigo_programa}.pdf"
 
 
 def prepare_report_paths(base_directory, period, level, modality, program, source_csv, program_code=None):
-    directory = build_report_directory(base_directory, period, level, modality, program)
-    csv_name = sanitize_name(Path(source_csv).name)
+    carpeta_informe = build_report_directory(base_directory, period, level, modality, program)
+    nombre_csv = sanitize_name(Path(source_csv).name)
     return ReportPaths(
-        directory=directory,
-        source_csv=directory / csv_name,
-        excel=build_excel_path(directory, period),
-        word=build_word_path(directory, period, program_code) if program_code else None,
-        pdf=build_pdf_path(directory, period, program_code) if program_code else None,
+        directory=carpeta_informe,
+        source_csv=carpeta_informe / nombre_csv,
+        excel=build_excel_path(carpeta_informe, period),
+        word=build_word_path(carpeta_informe, period, program_code) if program_code else None,
+        pdf=build_pdf_path(carpeta_informe, period, program_code) if program_code else None,
     )
 
 
 def copy_source_csv(source_csv, destination, overwrite=False, progress_callback=None):
-    source = Path(source_csv)
-    target = Path(destination)
-    if not source.is_file():
+    archivo_origen = Path(source_csv)
+    archivo_destino = Path(destination)
+    if not archivo_origen.is_file():
         raise FileNotFoundError("El CSV seleccionado ya no existe.")
-    target.parent.mkdir(parents=True, exist_ok=True)
-    if source.resolve() == target.resolve():
+    archivo_destino.parent.mkdir(parents=True, exist_ok=True)
+    if archivo_origen.resolve() == archivo_destino.resolve():
         if progress_callback:
             progress_callback(100)
-        return target
-    if target.exists() and not overwrite:
-        raise FileExistsError(str(target))
-    total_size = max(source.stat().st_size, 1)
-    copied = 0
-    with source.open("rb") as input_file, target.open("wb") as output_file:
-        while block := input_file.read(4 * 1024 * 1024):
-            output_file.write(block)
-            copied += len(block)
+        return archivo_destino
+    if archivo_destino.exists() and not overwrite:
+        raise FileExistsError(str(archivo_destino))
+    tamano_total = max(archivo_origen.stat().st_size, 1)
+    bytes_copiados = 0
+    with archivo_origen.open("rb") as entrada, archivo_destino.open("wb") as salida:
+        while bloque := entrada.read(4 * 1024 * 1024):
+            salida.write(bloque)
+            bytes_copiados += len(bloque)
             if progress_callback:
-                progress_callback(min(45 + int(copied * 55 / total_size), 99))
-    shutil.copystat(source, target)
+                progress_callback(min(45 + int(bytes_copiados * 55 / tamano_total), 99))
+    shutil.copystat(archivo_origen, archivo_destino)
     if progress_callback:
         progress_callback(100)
-    return target
+    return archivo_destino
