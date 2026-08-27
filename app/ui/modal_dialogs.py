@@ -54,6 +54,31 @@ QDialog#institutionalDialog QListWidget {
 }
 QDialog#institutionalDialog QListWidget::item { padding: 8px; }
 QDialog#institutionalDialog QListWidget::item:selected { background-color: #E7F1FA; color: #0A4D91; }
+QLabel#historyDialogTitle { color: #071D38; font-size: 20px; font-weight: 800; }
+QLabel#historyCountBadge {
+    background-color: #E7F1FA; color: #0A4D91; border-radius: 11px;
+    padding: 5px 11px; font-size: 10px; font-weight: 800;
+}
+QListWidget#reportHistoryList {
+    background-color: #F6F8FB; border: 1px solid #E1E7EF;
+    border-radius: 12px; padding: 10px;
+}
+QListWidget#reportHistoryList::item { padding: 0px; border: none; border-radius: 10px; }
+QListWidget#reportHistoryList::item:selected { background-color: #DDEBFA; }
+QFrame#historyRecordCard { background-color: #FFFFFF; border: 1px solid #DFE6EF; border-radius: 10px; }
+QLabel#historyRecordTitle { color: #102D50; font-size: 13px; font-weight: 800; }
+QLabel#historyRecordMeta { color: #718096; font-size: 10px; }
+QLabel#completedHistoryIcon, QLabel#pendingHistoryIcon {
+    color: #FFFFFF; border-radius: 19px; font-size: 16px; font-weight: 900;
+}
+QLabel#completedHistoryIcon { background-color: #16824B; }
+QLabel#pendingHistoryIcon { background-color: #1B63AF; }
+QLabel#completedHistoryPill, QLabel#pendingHistoryPill, QLabel#errorHistoryPill {
+    border-radius: 11px; padding: 5px 9px; font-size: 9px; font-weight: 800;
+}
+QLabel#completedHistoryPill { background-color: #E3F4EA; color: #137346; }
+QLabel#pendingHistoryPill { background-color: #E7F1FA; color: #0A4D91; }
+QLabel#errorHistoryPill { background-color: #FCE8EA; color: #B42332; }
 QDialog#institutionalDialog QDialogButtonBox QPushButton,
 QDialog#institutionalDialog > QPushButton {
     background-color: #FFFFFF; color: #31516F; border: 1px solid #CBD5E1;

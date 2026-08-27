@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
+from PySide6.QtCore import QSize, Qt, QUrl, Signal
+from PySide6.QtGui import QColor, QDesktopServices, QIcon, QPixmap
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -24,7 +24,10 @@ from app.ui.modal_dialogs import MODAL_STYLE, exec_modal
 from app.ui.window_chrome import preparar_ventana_sin_marco
 from app.ui.excel_process_window import ExcelProcessWindow
 from app.ui.users_window import UsersPage
-from app.services.process_history_service import list_incomplete_processes
+from app.services.process_history_service import (
+    list_completed_processes,
+    list_incomplete_processes,
+)
 
 ASSETS = Path(__file__).parent / "assets"
 
@@ -36,17 +39,7 @@ def named(widget, object_name):
 
 
 class WorkflowPanel(QWidget):
-    def paintEvent(self, event):
-        super().paintEvent(event)
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-        painter.setPen(QPen(QColor("#8D99AA"), 2, Qt.SolidLine, Qt.RoundCap))
-        y = int(self.height() * .43)
-        painter.drawLine(int(self.width() * .27), y, int(self.width() * .73), y)
-        painter.setPen(Qt.NoPen)
-        painter.setBrush(QColor("#8D99AA"))
-        for x in (.39, .61):
-            painter.drawEllipse(int(self.width() * x) - 5, y - 5, 10, 10)
+    """Contenedor limpio para los pasos principales del flujo."""
 
 
 class ProcessCard(QFrame):
@@ -55,24 +48,20 @@ class ProcessCard(QFrame):
     def __init__(self, number, icon_name, decoration_name, title, description):
         super().__init__()
         self.setObjectName("processCard")
-        self.setMinimumHeight(260)
+        self.setMinimumHeight(470)
+        self.setMaximumHeight(525)
         shadow = QGraphicsDropShadowEffect(self)
         shadow.setBlurRadius(22)
         shadow.setOffset(0, 5)
         shadow.setColor(QColor(15, 38, 68, 25))
         self.setGraphicsEffect(shadow)
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(18, 16, 18, 16)
-        layout.setSpacing(9)
+        layout.setContentsMargins(22, 20, 22, 22)
+        layout.setSpacing(10)
         badge = QLabel(str(number))
         badge.setObjectName("stepBadge")
         badge.setAlignment(Qt.AlignCenter)
-        badge.setFixedSize(28, 28)
-        icon = QLabel()
-        icon.setObjectName("processIcon")
-        icon.setAlignment(Qt.AlignCenter)
-        icon.setPixmap(QPixmap(str(ASSETS / icon_name)).scaled(90, 90, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-        icon.setFixedHeight(102)
+        badge.setFixedSize(34, 34)
         card_title = QLabel(title)
         card_title.setObjectName("processTitle")
         card_title.setAlignment(Qt.AlignCenter)
@@ -86,24 +75,65 @@ class ProcessCard(QFrame):
         decoration.setAlignment(Qt.AlignCenter)
         decoration.setPixmap(
             QPixmap(str(ASSETS / decoration_name)).scaled(
-                360, 150, Qt.KeepAspectRatio, Qt.SmoothTransformation
+                330, 230, Qt.KeepAspectRatio, Qt.SmoothTransformation
             )
         )
-        decoration.setMinimumHeight(155)
+        decoration.setMinimumHeight(215)
 
         button = QPushButton("Abrir módulo    →")
         button.setObjectName("openModuleButton")
         button.setCursor(Qt.PointingHandCursor)
-        button.setMinimumHeight(36)
+        button.setMinimumHeight(44)
         button.clicked.connect(self.clicked.emit)
         layout.addWidget(badge, alignment=Qt.AlignLeft)
-        layout.addWidget(icon)
+        layout.addWidget(decoration, 1)
         layout.addWidget(card_title)
         layout.addWidget(body)
-        layout.addStretch(1)
-        layout.addWidget(decoration)
-        layout.addStretch(1)
+        layout.addSpacing(10)
         layout.addWidget(button)
+
+
+class HistoryRecordWidget(QFrame):
+    """Tarjeta compacta para un informe terminado o pendiente."""
+
+    def __init__(self, registro, terminado=False):
+        super().__init__()
+        self.setObjectName("historyRecordCard")
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(14, 10, 14, 10)
+        layout.setSpacing(13)
+        icono = QLabel("✓" if terminado else "↻")
+        icono.setObjectName("completedHistoryIcon" if terminado else "pendingHistoryIcon")
+        icono.setAlignment(Qt.AlignCenter)
+        icono.setFixedSize(38, 38)
+        textos = QVBoxLayout()
+        textos.setSpacing(3)
+        titulo = QLabel(f"{registro['program']}  ·  {registro['period']}")
+        titulo.setObjectName("historyRecordTitle")
+        detalle = "  ·  ".join(
+            valor for valor in (
+                registro.get("modality"), registro.get("owner_name", ""),
+                registro.get("updated_at"),
+            ) if valor
+        )
+        meta = QLabel(detalle)
+        meta.setObjectName("historyRecordMeta")
+        textos.addWidget(titulo)
+        textos.addWidget(meta)
+        estado_texto = "Terminado" if terminado else (
+            "Con error" if registro.get("status") == "error"
+            else f"Paso {registro.get('completed_step', 0)} de 8"
+        )
+        estado = QLabel(estado_texto)
+        estado.setObjectName(
+            "completedHistoryPill" if terminado else
+            ("errorHistoryPill" if registro.get("status") == "error" else "pendingHistoryPill")
+        )
+        estado.setAlignment(Qt.AlignCenter)
+        estado.setMinimumWidth(92)
+        layout.addWidget(icono)
+        layout.addLayout(textos, 1)
+        layout.addWidget(estado)
 
 
 class ModuleDialog(QDialog):
@@ -192,10 +222,10 @@ class DashboardWindow(QMainWindow):
 
     def _create_sidebar(self):
         sidebar = named(QFrame(), "dashboardSidebar")
-        sidebar.setFixedWidth(238)
+        sidebar.setFixedWidth(255)
         layout = QVBoxLayout(sidebar)
-        layout.setContentsMargins(24, 24, 20, 22)
-        layout.setSpacing(5)
+        layout.setContentsMargins(26, 28, 22, 24)
+        layout.setSpacing(7)
         brand = QHBoxLayout()
         logo = QLabel()
         logo.setPixmap(QPixmap(str(ASSETS / "usta-crest.png")).scaled(56, 56, Qt.KeepAspectRatio, Qt.SmoothTransformation))
@@ -204,10 +234,10 @@ class DashboardWindow(QMainWindow):
         brand.addWidget(logo)
         brand.addWidget(university)
         layout.addLayout(brand)
-        layout.addSpacing(22)
+        layout.addSpacing(26)
         layout.addWidget(named(QLabel("Plataforma\nde Informes"), "sidebarTitle"))
         layout.addWidget(named(QLabel("Transforma datos en\ndecisiones claras."), "sidebarSubtitle"))
-        layout.addSpacing(18)
+        layout.addSpacing(22)
         nav = [
             ("Procesos", "history.svg", self._show_dashboard, True),
             ("Informes", "document.svg", self._open_reports, False),
@@ -226,17 +256,6 @@ class DashboardWindow(QMainWindow):
             users.clicked.connect(self._open_users)
             layout.addWidget(users)
         layout.addStretch()
-        name = self.user.get("full_name") or self.user.get("username", "Usuario")
-        initials = "".join(p[0] for p in name.split()[:2]).upper() or "U"
-        profile = QHBoxLayout()
-        avatar = named(QLabel(initials), "sidebarAvatar")
-        avatar.setAlignment(Qt.AlignCenter)
-        avatar.setFixedSize(38, 38)
-        role = "Administrador" if self.user["role"] == "admin" else "Analista de datos"
-        profile.addWidget(avatar)
-        profile.addWidget(named(QLabel(f"<b>{name}</b><br><span>{role}</span>"), "sidebarProfile"), 1)
-        layout.addLayout(profile)
-        layout.addSpacing(14)
         logout = self._nav("Cerrar sesión", "logout.svg")
         logout.setObjectName("logoutNavButton")
         logout.clicked.connect(self.logout_requested.emit)
@@ -246,37 +265,36 @@ class DashboardWindow(QMainWindow):
     def _create_content(self):
         content = named(QWidget(), "dashboardContent")
         layout = QVBoxLayout(content)
-        layout.setContentsMargins(36, 24, 36, 18)
-        layout.setSpacing(10)
+        layout.setContentsMargins(32, 26, 32, 20)
+        layout.setSpacing(11)
         name = self.user.get("full_name") or self.user.get("username", "Usuario")
         header = QHBoxLayout()
         header.addWidget(named(QLabel("⌂    Inicio    /    Procesos"), "dashboardSection"))
         header.addStretch()
         header.addWidget(named(QLabel(f"♢    {name}  ⌄"), "dashboardUser"))
         layout.addLayout(header)
-        line = named(QFrame(), "headerLine")
-        line.setFixedHeight(1)
-        layout.addWidget(line)
-        layout.addSpacing(16)
-        layout.addWidget(named(QLabel("TU RUTA DE TRABAJO"), "routeEyebrow"))
+        layout.addSpacing(24)
         layout.addWidget(named(QLabel("¿Qué quieres crear hoy?"), "routeTitle"))
         layout.addWidget(named(QLabel("Sigue estos pasos para convertir tus datos en informes institucionales listos para usar."), "routeSubtitle"))
-        layout.addSpacing(12)
+        layout.addSpacing(22)
         workflow = named(WorkflowPanel(), "workflowPanel")
         cards = QHBoxLayout(workflow)
         cards.setContentsMargins(0, 0, 0, 0)
-        cards.setSpacing(26)
+        cards.setSpacing(20)
         data = [
             (1, "process-excel.png", "card-excel-scene.png", "Preparar Excel", "Organiza y valida la información exportada desde Moodle.", self.excel_requested.emit),
-            (2, "process-report.png", "card-report-scene.png", "Crear informe", "Convierte el Excel en el documento institucional.", self._open_reports),
+            (2, "process-report.png", "card-report-scene.png", "Crear informe", "Convierte el Excel en el documento institucional.", self._open_report_creation),
             (3, "process-history.png", "card-history-scene.png", "Consultar historial", "Encuentra rápidamente los informes anteriores.", self._open_history),
         ]
         for number, icon, decoration, title, body, callback in data:
             card = ProcessCard(number, icon, decoration, title, body)
             card.clicked.connect(callback)
             cards.addWidget(card)
+        workflow.setMinimumHeight(470)
+        workflow.setMaximumHeight(525)
         layout.addWidget(workflow, 1)
-        layout.addSpacing(8)
+        layout.addStretch(1)
+        layout.addSpacing(6)
         layout.addWidget(named(QLabel("Versión 1.0.0   •   Plataforma de Informes USTA"), "dashboardFooter"))
         return content
 
@@ -285,10 +303,89 @@ class DashboardWindow(QMainWindow):
             self.stack.setCurrentWidget(self.users_page)
 
     def _open_excel(self):
+        self.excel_page.preparar_nuevo_informe()
         self.stack.setCurrentWidget(self.excel_page)
 
     def _open_reports(self):
-        """Abre el flujo disponible para preparar un nuevo informe."""
+        """Muestra todos los informes finalizados disponibles para el usuario."""
+        informes = list_completed_processes(self.user)
+        dialog = QDialog(self)
+        dialog.setObjectName("institutionalDialog")
+        dialog.setStyleSheet(MODAL_STYLE)
+        dialog.setWindowTitle("Informes terminados")
+        dialog.setMinimumSize(720, 460)
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(
+            preparar_ventana_sin_marco(dialog, "Informes terminados", False)
+        )
+        content = QVBoxLayout()
+        content.setContentsMargins(24, 22, 24, 20)
+        content.setSpacing(12)
+        title_row = QHBoxLayout()
+        title = QLabel("Historial de informes terminados")
+        title.setObjectName("historyDialogTitle")
+        count = QLabel(f"{len(informes)} informes")
+        count.setObjectName("historyCountBadge")
+        title_row.addWidget(title)
+        title_row.addStretch()
+        title_row.addWidget(count)
+        description = QLabel(
+            "Consulta los informes completados y abre el archivo Excel guardado."
+        )
+        description.setStyleSheet("color: #526A82; font-size: 11px;")
+        results = QListWidget()
+        results.setObjectName("reportHistoryList")
+        results.setSpacing(8)
+        for informe in informes:
+            item = QListWidgetItem()
+            item.setData(Qt.UserRole, informe)
+            item.setSizeHint(QSize(0, 76))
+            results.addItem(item)
+            results.setItemWidget(item, HistoryRecordWidget(informe, terminado=True))
+        if not informes:
+            results.addItem("Todavía no hay informes terminados.")
+
+        def abrir_seleccionado():
+            item = results.currentItem()
+            informe = item.data(Qt.UserRole) if item else None
+            if not informe:
+                return
+            ruta = Path(informe["workbook_path"])
+            if not ruta.is_file():
+                exec_modal(
+                    ModuleDialog(
+                        "Archivo no encontrado",
+                        "El registro existe, pero el archivo fue movido o eliminado.",
+                        dialog,
+                    )
+                )
+                return
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(ruta.resolve())))
+
+        actions = QHBoxLayout()
+        close = QPushButton("Cerrar")
+        close.setObjectName("dialogSecondaryButton")
+        close.clicked.connect(dialog.reject)
+        open_button = QPushButton("Abrir informe")
+        open_button.setObjectName("dialogPrimaryButton")
+        open_button.setEnabled(bool(informes))
+        open_button.clicked.connect(abrir_seleccionado)
+        results.itemDoubleClicked.connect(lambda _: abrir_seleccionado())
+        actions.addStretch()
+        actions.addWidget(close)
+        actions.addWidget(open_button)
+        content.addLayout(title_row)
+        content.addWidget(description)
+        content.addWidget(results, 1)
+        content.addLayout(actions)
+        layout.addLayout(content, 1)
+        exec_modal(dialog)
+
+    def _open_report_creation(self):
+        """Mantiene la acción de creación separada del archivo de terminados."""
+        self.excel_page.preparar_nuevo_informe()
         self.stack.setCurrentWidget(self.excel_page)
 
     def _open_history(self):
@@ -305,23 +402,27 @@ class DashboardWindow(QMainWindow):
         content = QVBoxLayout()
         content.setContentsMargins(24, 22, 24, 20)
         content.setSpacing(12)
+        title_row = QHBoxLayout()
         title = QLabel("Informes pendientes")
-        title.setStyleSheet("font-size: 18px; font-weight: 700; color: #071D38;")
+        title.setObjectName("historyDialogTitle")
+        count = QLabel(f"{len(procesos)} pendientes")
+        count.setObjectName("historyCountBadge")
+        title_row.addWidget(title)
+        title_row.addStretch()
+        title_row.addWidget(count)
         description = QLabel(
             "Selecciona un proceso para continuar desde el último paso completado."
         )
         description.setStyleSheet("color: #526A82; font-size: 11px;")
         results = QListWidget()
+        results.setObjectName("reportHistoryList")
+        results.setSpacing(8)
         for proceso in procesos:
-            estado = "Con error" if proceso["status"] == "error" else "En proceso"
-            item = QListWidgetItem(
-                f"{proceso['period']}  ·  {proceso['program']}  ·  "
-                f"{proceso['modality']}\n"
-                f"{estado}  —  Paso {proceso['completed_step']} de 3  —  "
-                f"Actualizado: {proceso['updated_at']}"
-            )
+            item = QListWidgetItem()
             item.setData(Qt.UserRole, proceso)
+            item.setSizeHint(QSize(0, 76))
             results.addItem(item)
+            results.setItemWidget(item, HistoryRecordWidget(proceso))
         if not procesos:
             results.addItem("No hay informes pendientes. Todos los procesos están completos.")
 
@@ -349,7 +450,7 @@ class DashboardWindow(QMainWindow):
         actions.addStretch()
         actions.addWidget(close)
         actions.addWidget(resume)
-        content.addWidget(title)
+        content.addLayout(title_row)
         content.addWidget(description)
         content.addWidget(results, 1)
         content.addLayout(actions)

@@ -2,8 +2,8 @@
 
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QThread, Qt, Signal, Slot
-from PySide6.QtGui import QPixmap
+from PySide6.QtCore import QObject, QThread, Qt, QUrl, Signal, Slot
+from PySide6.QtGui import QDesktopServices, QPixmap
 from PySide6.QtWidgets import (
     QComboBox, QDialog, QFileDialog, QFrame, QGridLayout, QHBoxLayout,
     QLabel, QListWidget, QProgressBar, QPushButton, QScrollArea,
@@ -61,10 +61,12 @@ class BackgroundTask(QObject):
 
 class ProcessStepRow(QFrame):
     requested = Signal()
+    excel_view_requested = Signal()
 
-    def __init__(self, number, title, description, executable=True):
+    def __init__(self, number, title, description, executable=True, has_chart=False):
         super().__init__()
         self.number = number
+        self.has_chart = has_chart
         self.setObjectName("excelStepRow")
         self.setMinimumHeight(72)
         self.state = "pending"
@@ -90,10 +92,16 @@ class ProcessStepRow(QFrame):
         self.button.setVisible(executable)
         self.button.setEnabled(False)
         self.button.setMinimumWidth(140)
+        self.view_button = QPushButton("Ver en Excel")
+        self.view_button.setObjectName("stepActionButton")
+        self.view_button.setMinimumWidth(140)
+        self.view_button.setVisible(False)
+        self.view_button.clicked.connect(self.excel_view_requested.emit)
         row.addWidget(self.badge)
         row.addLayout(copy, 1)
         row.addWidget(self.status)
         row.addWidget(self.button)
+        row.addWidget(self.view_button)
 
     def set_state(self, state, message=None):
         self.state = state
@@ -109,6 +117,9 @@ class ProcessStepRow(QFrame):
         self.status.style().unpolish(self.status)
         self.status.style().polish(self.status)
         self.button.setEnabled(state in {"available", "error"})
+        mostrar_excel = self.has_chart and state == "completed"
+        self.button.setVisible(not mostrar_excel)
+        self.view_button.setVisible(mostrar_excel)
 
 
 class OptionManagementDialog(QDialog):
@@ -254,12 +265,63 @@ class ExcelProcessWindow(QWidget):
         self.base_directory = None
         self.report_paths = None
         self.completed_step = 0
+        self._report_saved = False
         self.steps = []
         self._thread = None
         self._worker = None
         self._control_states = {}
         self.setStyleSheet(EXCEL_MODULE_STYLESHEET)
         self._build_ui()
+
+    def preparar_nuevo_informe(self):
+        """Limpia un informe terminado antes de comenzar otro flujo."""
+        if not self._report_saved:
+            return False
+        self._limpiar_formulario()
+        return True
+
+    def _limpiar_formulario(self):
+        """Desvincula el proceso actual y devuelve el módulo a su estado inicial."""
+        carpeta_conservada = self.base_directory
+        self.excel_process = ExcelProcess()
+        self.csv_path = None
+        self.base_directory = carpeta_conservada
+        self.report_paths = None
+        self.completed_step = 0
+        self._report_saved = False
+        for paso in self.steps:
+            paso.set_state("pending")
+        self.file_label.setText("Ningún archivo seleccionado")
+        self.file_label.setToolTip("")
+        if carpeta_conservada:
+            self.base_label.setText(str(carpeta_conservada))
+            self.base_label.setToolTip(str(carpeta_conservada))
+        else:
+            self.base_label.setText("Ninguna carpeta base seleccionada")
+            self.base_label.setToolTip("")
+        self._actualizar_estado_boton_carga(False)
+        self.preview_button.setEnabled(False)
+        self.save_button.setEnabled(False)
+        self.progress_bar.hide()
+        self.feedback.setText(
+            "Selecciona el periodo, el programa y un archivo CSV para comenzar."
+        )
+        self._update_destination()
+
+    def _volver_al_dashboard(self):
+        """Archiva el avance pendiente y libera la pantalla para otro informe."""
+        proceso_cargado = (
+            self.report_paths is not None
+            and self.csv_path is not None
+            and (
+                self.completed_step > 0
+                or self.load_button.objectName() == "loadedCsvButton"
+            )
+        )
+        if proceso_cargado and not self._report_saved:
+            self._guardar_avance(self.completed_step)
+        self._limpiar_formulario()
+        self.back_requested.emit()
 
     def _build_ui(self):
         diseno_exterior = QVBoxLayout(self)
@@ -281,7 +343,10 @@ class ExcelProcessWindow(QWidget):
         top = QHBoxLayout()
         back = QPushButton("←  Volver al dashboard")
         back.setObjectName("excelBackButton")
-        back.clicked.connect(self.back_requested.emit)
+        back.setCursor(Qt.PointingHandCursor)
+        back.setFixedHeight(38)
+        back.setMinimumWidth(190)
+        back.clicked.connect(self._volver_al_dashboard)
         top.addWidget(back)
         top.addStretch()
         root.addLayout(top)
@@ -434,32 +499,67 @@ class ExcelProcessWindow(QWidget):
         columns_layout.addWidget(action_column)
         root.addWidget(columns_header)
 
-        scroll = QScrollArea()
-        scroll.setObjectName("excelStepsScroll")
-        scroll.setWidgetResizable(True)
-        scroll.setFixedHeight(245)
-        steps_page = QWidget()
+        steps_page = QFrame()
+        steps_page.setObjectName("excelStepsContainer")
         steps_layout = QVBoxLayout(steps_page)
-        steps_layout.setContentsMargins(0, 0, 8, 0)
+        steps_layout.setContentsMargins(6, 4, 6, 4)
+        steps_layout.setSpacing(0)
         definitions = (
-            ("Crear hoja Original", "Copia todos los datos del CSV sin transformarlos.", True),
-            ("Convertir FechaUnix", "Agrega Fecha, Mes y Dia junto a FechaUnix en Original.", True),
+            ("Crear hoja Original", "Copia todos los datos del CSV sin transformarlos.", True, False),
+            ("Convertir FechaUnix", "Agrega Fecha, Mes y Dia junto a FechaUnix en Original.", True, False),
             (
                 "Procesar docentes",
                 "Calcula días distintos, totales y promedios por mes.",
                 True,
+                False,
+            ),
+            (
+                "Generar gráfica docentes",
+                "Crea Docentes DG con el promedio mensual y su gráfica de líneas.",
+                True,
+                True,
+            ),
+            (
+                "Procesar estudiantes",
+                "Crea la tabla combinada de días y estudiantes por mes.",
+                True,
+                False,
+            ),
+            (
+                "Generar gráficas estudiantes",
+                "Crea Estudiantes DG y Estudiantes DG2 con estilo institucional.",
+                True,
+                True,
+            ),
+            (
+                "Procesar actividades",
+                "Cuenta las acciones por curso y crea Tabla Dinamica Actividades.",
+                True,
+                False,
+            ),
+            (
+                "Crear diseño de cursos",
+                "Resume cursos unificados y cursos con o sin contenido.",
+                True,
+                True,
             ),
         )
-        for number, (name, description, executable) in enumerate(definitions, 1):
-            step = ProcessStepRow(number, name, description, executable)
+        for number, (name, description, executable, has_chart) in enumerate(definitions, 1):
+            step = ProcessStepRow(number, name, description, executable, has_chart)
             self.steps.append(step)
             steps_layout.addWidget(step)
         self.steps[0].requested.connect(self._create_original)
         self.steps[1].requested.connect(self._prepare_information)
         self.steps[2].requested.connect(self._crear_tabla_docentes)
-        steps_layout.addStretch()
-        scroll.setWidget(steps_page)
-        root.addWidget(scroll)
+        self.steps[3].requested.connect(self._crear_grafica_docentes)
+        self.steps[3].excel_view_requested.connect(self._ver_en_excel)
+        self.steps[4].requested.connect(self._crear_tabla_estudiantes)
+        self.steps[5].requested.connect(self._crear_grafica_estudiantes)
+        self.steps[5].excel_view_requested.connect(self._ver_en_excel)
+        self.steps[6].requested.connect(self._crear_tabla_actividades)
+        self.steps[7].requested.connect(self._crear_diseno_cursos)
+        self.steps[7].excel_view_requested.connect(self._ver_en_excel)
+        root.addWidget(steps_page)
         root.addStretch(1)
 
         self.feedback = QLabel("Selecciona el periodo, el programa y un archivo CSV para comenzar.")
@@ -494,6 +594,9 @@ class ExcelProcessWindow(QWidget):
         """Crea una lista cerrada con las opciones guardadas en la base de datos."""
         lista = QComboBox()
         lista.setEditable(False)
+        lista.setMaxVisibleItems(8)
+        lista.view().setSpacing(2)
+        lista.view().setUniformItemSizes(True)
         lista.addItems(list_report_options(categoria))
         return lista
 
@@ -631,6 +734,7 @@ class ExcelProcessWindow(QWidget):
         )
         self.excel_process = ExcelProcess(ruta_borrador)
         self.completed_step = 0
+        self._report_saved = False
         datos_academicos = (
             self.base_directory,
             self.period.currentText(),
@@ -639,6 +743,13 @@ class ExcelProcessWindow(QWidget):
             self.program.currentText(),
         )
         self.steps[0].set_state("pending")
+        self.steps[1].set_state("pending")
+        self.steps[2].set_state("pending")
+        self.steps[3].set_state("pending")
+        self.steps[4].set_state("pending")
+        self.steps[5].set_state("pending")
+        self.steps[6].set_state("pending")
+        self.steps[7].set_state("pending")
         self._start_background(
             lambda progreso: self._validate_and_copy_csv(
                 ruta_csv_origen, rutas_informe, reemplazar_csv, datos_academicos, progreso
@@ -669,6 +780,11 @@ class ExcelProcessWindow(QWidget):
         self.steps[0].set_state("available")
         self.steps[1].set_state("pending")
         self.steps[2].set_state("pending")
+        self.steps[3].set_state("pending")
+        self.steps[4].set_state("pending")
+        self.steps[5].set_state("pending")
+        self.steps[6].set_state("pending")
+        self.steps[7].set_state("pending")
         self.preview_button.setEnabled(False)
         self.save_button.setEnabled(False)
         self.feedback.setText(
@@ -702,10 +818,13 @@ class ExcelProcessWindow(QWidget):
         self._worker.moveToThread(self._thread)
         self._thread.started.connect(self._worker.run)
         self._worker.progress.connect(self.progress_bar.setValue)
-        self._worker.finished.connect(self._finish_background)
-        self._worker.failed.connect(self._finish_background)
         self._worker.finished.connect(on_success)
         self._worker.failed.connect(on_error)
+        self._worker.finished.connect(self._thread.quit)
+        self._worker.failed.connect(self._thread.quit)
+        self._worker.finished.connect(self._worker.deleteLater)
+        self._worker.failed.connect(self._worker.deleteLater)
+        self._thread.finished.connect(self._finish_background)
         self._thread.start()
 
     def _bloquear_controles(self):
@@ -714,8 +833,15 @@ class ExcelProcessWindow(QWidget):
             *self.findChildren(QPushButton),
             *self.findChildren(QComboBox),
         ]
+        botones_del_flujo = {
+            boton
+            for paso in self.steps
+            for boton in (paso.button, paso.view_button)
+        }
         self._control_states = {
-            control: control.isEnabled() for control in controles
+            control: control.isEnabled()
+            for control in controles
+            if control not in botones_del_flujo
         }
         for control in controles:
             control.setEnabled(False)
@@ -730,14 +856,14 @@ class ExcelProcessWindow(QWidget):
         self._control_states.clear()
 
     @Slot()
-    def _finish_background(self, *_):
+    def _finish_background(self):
+        """Limpia referencias cuando Qt confirma que el hilo ya terminó."""
         self.progress_bar.hide()
-        self._thread.quit()
-        self._thread.wait()
-        self._worker.deleteLater()
-        self._thread.deleteLater()
+        hilo_finalizado = self._thread
         self._worker = None
         self._thread = None
+        if hilo_finalizado:
+            hilo_finalizado.deleteLater()
         self._restaurar_controles()
         self.load_button.setEnabled(bool(self.csv_path and self.base_directory))
         excel_disponible = self.excel_process.exists
@@ -774,6 +900,11 @@ class ExcelProcessWindow(QWidget):
         self.steps[0].set_state("completed")
         self.steps[1].set_state("available")
         self.steps[2].set_state("pending")
+        self.steps[3].set_state("pending")
+        self.steps[4].set_state("pending")
+        self.steps[5].set_state("pending")
+        self.steps[6].set_state("pending")
+        self.steps[7].set_state("pending")
         self.preview_button.setEnabled(True)
         self.save_button.setEnabled(True)
         self.feedback.setText(
@@ -786,6 +917,11 @@ class ExcelProcessWindow(QWidget):
         cantidad_filas, cantidad_columnas = resultado_preparacion
         self.steps[1].set_state("completed")
         self.steps[2].set_state("available")
+        self.steps[3].set_state("pending")
+        self.steps[4].set_state("pending")
+        self.steps[5].set_state("pending")
+        self.steps[6].set_state("pending")
+        self.steps[7].set_state("pending")
         self.preview_button.setEnabled(True)
         self.save_button.setEnabled(True)
         self.feedback.setText(
@@ -807,6 +943,11 @@ class ExcelProcessWindow(QWidget):
     def _tabla_docentes_creada(self, resultado):
         cantidad_filas, meses = resultado
         self.steps[2].set_state("completed")
+        self.steps[3].set_state("available")
+        self.steps[4].set_state("pending")
+        self.steps[5].set_state("pending")
+        self.steps[6].set_state("pending")
+        self.steps[7].set_state("pending")
         self.preview_button.setEnabled(True)
         self.save_button.setEnabled(True)
         self.feedback.setText(
@@ -815,6 +956,159 @@ class ExcelProcessWindow(QWidget):
         )
         self.completed_step = 3
         self._guardar_avance(3)
+
+    def _crear_grafica_docentes(self):
+        self.steps[3].set_state("available", "Procesando…")
+        programa = self.program.currentText()
+        periodo = self.period.currentText()
+        self._start_background(
+            lambda progreso: self.excel_process.crear_grafica_docentes(
+                programa, periodo, progreso
+            ),
+            self._grafica_docentes_creada,
+            lambda mensaje: self._task_failed(
+                3, "Error al crear Docentes DG", mensaje
+            ),
+        )
+
+    def _grafica_docentes_creada(self, promedios):
+        self.steps[3].set_state("completed")
+        self.steps[4].set_state("available")
+        self.steps[5].set_state("pending")
+        self.steps[6].set_state("pending")
+        self.steps[7].set_state("pending")
+        self.preview_button.setEnabled(True)
+        self.save_button.setEnabled(True)
+        meses = ", ".join(mes for mes, _ in promedios)
+        self.feedback.setText(f"Docentes DG creada correctamente. Meses: {meses}.")
+        self.completed_step = 4
+        self._guardar_avance(4)
+
+    def _crear_tabla_estudiantes(self):
+        self.steps[4].set_state("available", "Procesando…")
+        programa = self.program.currentText()
+        periodo = self.period.currentText()
+        self._start_background(
+            lambda progreso: self.excel_process.crear_tabla_estudiantes(
+                programa, periodo, progreso
+            ),
+            self._tabla_estudiantes_creada,
+            lambda mensaje: self._task_failed(
+                4, "Error al crear Tabla Dinamica Estudiantes", mensaje
+            ),
+        )
+
+    def _tabla_estudiantes_creada(self, resultado):
+        cantidad_cursos, meses = resultado
+        self.steps[4].set_state("completed")
+        self.steps[5].set_state("available")
+        self.steps[6].set_state("pending")
+        self.steps[7].set_state("pending")
+        self.preview_button.setEnabled(True)
+        self.save_button.setEnabled(True)
+        self.feedback.setText(
+            f"Tabla Dinamica Estudiantes creada: {cantidad_cursos:,} cursos; "
+            f"meses: {', '.join(meses)}. Continúa con las gráficas."
+        )
+        self.completed_step = 5
+        self._guardar_avance(5)
+
+    def _crear_grafica_estudiantes(self):
+        self.steps[5].set_state("available", "Procesando…")
+        programa = self.program.currentText()
+        periodo = self.period.currentText()
+        self._start_background(
+            lambda progreso: self.excel_process.crear_grafica_estudiantes(
+                programa, periodo, progreso
+            ),
+            self._grafica_estudiantes_creada,
+            lambda mensaje: self._task_failed(
+                5, "Error al crear las gráficas de estudiantes", mensaje
+            ),
+        )
+
+    def _grafica_estudiantes_creada(self, meses):
+        self.steps[5].set_state("completed")
+        self.steps[6].set_state("available")
+        self.steps[7].set_state("pending")
+        self.preview_button.setEnabled(True)
+        self.save_button.setEnabled(True)
+        self.feedback.setText(
+            f"Estudiantes DG y Estudiantes DG2 creadas. Meses: {', '.join(meses)}."
+        )
+        self.completed_step = 6
+        self._guardar_avance(6)
+
+    def _crear_tabla_actividades(self):
+        self.steps[6].set_state("available", "Procesando…")
+        programa = self.program.currentText()
+        periodo = self.period.currentText()
+        self._start_background(
+            lambda progreso: self.excel_process.crear_tabla_actividades(
+                programa, periodo, progreso
+            ),
+            self._tabla_actividades_creada,
+            lambda mensaje: self._task_failed(
+                6, "Error al crear Tabla Dinamica Actividades", mensaje
+            ),
+        )
+
+    def _tabla_actividades_creada(self, resultado):
+        cantidad_cursos, acciones = resultado
+        self.steps[6].set_state("completed")
+        self.steps[7].set_state("available")
+        self.preview_button.setEnabled(True)
+        self.save_button.setEnabled(True)
+        self.feedback.setText(
+            f"Tabla Dinamica Actividades creada: {cantidad_cursos:,} cursos; "
+            f"acciones: {', '.join(acciones)}."
+        )
+        self.completed_step = 7
+        self._guardar_avance(7)
+
+    def _crear_diseno_cursos(self):
+        self.steps[7].set_state("available", "Procesando…")
+        programa = self.program.currentText()
+        periodo = self.period.currentText()
+        self._start_background(
+            lambda progreso: self.excel_process.crear_diseno_cursos(
+                programa, periodo, progreso
+            ),
+            self._diseno_cursos_creado,
+            lambda mensaje: self._task_failed(
+                7, "Error al crear Diseño de Cursos", mensaje
+            ),
+        )
+
+    def _diseno_cursos_creado(self, indicadores):
+        unificados, sin_contenido, con_contenido = indicadores
+        self.steps[7].set_state("completed")
+        self.preview_button.setEnabled(True)
+        self.save_button.setEnabled(True)
+        self.feedback.setText(
+            "Diseño de Cursos creado: "
+            f"{unificados} unificados, {sin_contenido} sin contenido y "
+            f"{con_contenido} con contenido."
+        )
+        self.completed_step = 8
+        self._guardar_avance(8)
+
+    def _ver_en_excel(self):
+        """Abre el libro de trabajo para visualizar sus gráficas nativas."""
+        if not self.excel_process.exists:
+            show_error(
+                self, "No se puede abrir el Excel",
+                "Todavía no existe un archivo de trabajo para visualizar.",
+            )
+            return
+        abierto = QDesktopServices.openUrl(
+            QUrl.fromLocalFile(str(self.excel_process.path.resolve()))
+        )
+        if not abierto:
+            show_error(
+                self, "No se pudo abrir el Excel",
+                "No se encontró una aplicación asociada para abrir archivos .xlsx.",
+            )
 
     def _guardar_avance(self, paso_completado, status="in_progress", error_message=None):
         """Guarda el punto de recuperación sin interrumpir el proceso si SQLite falla."""
@@ -871,6 +1165,7 @@ class ExcelProcessWindow(QWidget):
         self._update_destination()
         self.excel_process = ExcelProcess(ruta_excel)
         self.completed_step = int(proceso["completed_step"])
+        self._report_saved = False
 
         for indice, paso in enumerate(self.steps):
             if indice < self.completed_step:
@@ -904,12 +1199,15 @@ class ExcelProcessWindow(QWidget):
             if not confirmado:
                 return
         try:
-            self.excel_process.save_as(destination)
+            ruta_temporal = self.excel_process.path
+            self.excel_process.finalize_as(destination)
         except OSError as error:
             show_error(self, "No se pudo guardar", str(error))
             return
         self.feedback.setText(f"Excel guardado en {destination}")
-        mark_process_completed(self.excel_process.path)
+        mark_process_completed(ruta_temporal, destination)
+        self._report_saved = True
+        self.save_button.setEnabled(False)
         show_info(
             self,
             "Excel guardado",

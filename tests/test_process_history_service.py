@@ -1,6 +1,7 @@
 from app.database import database
 from app.services import auth_service
 from app.services.process_history_service import (
+    list_completed_processes,
     list_incomplete_processes,
     mark_process_completed,
     save_process_progress,
@@ -34,6 +35,9 @@ def test_guarda_reanuda_y_completa_un_proceso(tmp_path, monkeypatch):
 
     mark_process_completed(libro)
     assert list_incomplete_processes(administrador) == []
+    terminados = list_completed_processes(administrador)
+    assert len(terminados) == 1
+    assert terminados[0]["program"] == pendientes[0]["program"]
 
 
 def test_usuario_solo_ve_sus_procesos_y_admin_ve_todos(tmp_path, monkeypatch):

@@ -307,37 +307,37 @@ QLabel#statusText { background: transparent; color: #70778A; font-size: 11px; }
 
 /* Dashboard institucional */
 QWidget#dashboardPage { background-color: #F7F9FC; color: #0B2240; font-family: "Segoe UI"; }
-QFrame#dashboardSidebar { background-color: #052B55; border: none; }
+QFrame#dashboardSidebar { background-color: #062F62; border: none; }
 QLabel#sidebarUniversity { color: #FFFFFF; font-size: 10px; font-weight: 800; letter-spacing: 1px; }
-QLabel#sidebarTitle { color: #FFFFFF; font-family: "Georgia"; font-size: 25px; font-weight: 700; }
-QLabel#sidebarSubtitle { color: #C0CDE0; font-size: 12px; line-height: 1.4; }
+QLabel#sidebarTitle { color: #FFFFFF; font-family: "Georgia"; font-size: 27px; font-weight: 700; }
+QLabel#sidebarSubtitle { color: #B9C9DE; font-size: 12px; line-height: 1.4; }
 QPushButton#navButton, QPushButton#activeNavButton, QPushButton#logoutNavButton {
-    text-align: left; border: none; border-radius: 9px; padding: 9px 12px;
-    color: #DDE7F4; background: transparent; font-size: 12px; font-weight: 500;
+    text-align: left; border: none; border-radius: 10px; padding: 10px 13px;
+    color: #E4EDF8; background: transparent; font-size: 12px; font-weight: 500;
 }
 QPushButton#navButton:hover, QPushButton#logoutNavButton:hover { background-color: #0B3B70; color: #FFFFFF; }
-QPushButton#activeNavButton { background-color: #114A89; color: #FFFFFF; font-weight: 700; }
+QPushButton#activeNavButton { background-color: #1555A5; color: #FFFFFF; font-weight: 700; }
 QLabel#sidebarAvatar { background-color: #547399; color: #FFFFFF; border-radius: 19px; font-weight: 700; }
 QLabel#sidebarProfile { color: #FFFFFF; font-size: 11px; }
-QWidget#dashboardContent { background-color: #F9FBFE; }
+QWidget#dashboardContent { background-color: #F8FAFD; }
 QLabel#dashboardSection { color: #183455; font-size: 12px; font-weight: 600; }
 QLabel#dashboardUser { color: #142C49; font-size: 12px; font-weight: 600; }
 QFrame#headerLine { background-color: #DDE3EB; border: none; }
 QLabel#routeEyebrow { color: #285998; font-size: 10px; font-weight: 900; letter-spacing: 2px; }
-QLabel#routeTitle { color: #071D38; font-family: "Segoe UI"; font-size: 31px; font-weight: 700; }
-QLabel#routeSubtitle { color: #66758A; font-family: "Segoe UI"; font-size: 13px; font-weight: 400; }
+QLabel#routeTitle { color: #061E49; font-family: "Segoe UI"; font-size: 34px; font-weight: 800; }
+QLabel#routeSubtitle { color: #63728A; font-family: "Segoe UI"; font-size: 13px; font-weight: 400; }
 QWidget#workflowPanel { background: transparent; }
-QFrame#processCard { background-color: #FFFFFF; border: 1px solid #DAE0E8; border-radius: 7px; }
-QFrame#processCard:hover { border: 1px solid #8DA7C7; background-color: #FCFDFF; }
-QLabel#stepBadge { background-color: #062F60; color: #FFFFFF; border-radius: 6px; font-size: 12px; font-weight: 800; }
+QFrame#processCard { background-color: #FFFFFF; border: 1px solid #D7DFEA; border-radius: 18px; }
+QFrame#processCard:hover { border: 1px solid #7FA8D8; background-color: #FFFFFF; }
+QLabel#stepBadge { background-color: #1767C5; color: #FFFFFF; border-radius: 17px; font-size: 14px; font-weight: 800; }
 QLabel#processIcon { background: transparent; }
-QLabel#processTitle { color: #0B2240; font-size: 16px; font-weight: 800; }
-QLabel#processDescription { color: #647286; font-size: 11px; }
+QLabel#processTitle { color: #071F4D; font-size: 17px; font-weight: 800; }
+QLabel#processDescription { color: #62728A; font-size: 12px; }
 QPushButton#openModuleButton {
-    background-color: #FFFFFF; color: #06449A; border: 1px solid #E1E6ED;
-    border-radius: 6px; padding: 8px 14px; font-size: 11px; font-weight: 800;
+    background-color: #0B62CE; color: #FFFFFF; border: none;
+    border-radius: 10px; padding: 10px 16px; font-size: 12px; font-weight: 800;
 }
-QPushButton#openModuleButton:hover { background-color: #06449A; color: #FFFFFF; border-color: #06449A; }
+QPushButton#openModuleButton:hover { background-color: #084EA7; color: #FFFFFF; }
 QLabel#dashboardFooter { color: #7D899A; font-size: 9px; }
 """
 
@@ -378,10 +378,19 @@ QLabel#sectionNumber {
 }
 QLabel#excelSectionTitle { background: transparent; color: #124A83; font-size: 13px; font-weight: 800; }
 QPushButton#excelBackButton {
-    background: transparent; color: #174E89; border: none; padding: 7px 0;
-    text-align: left; font-size: 12px; font-weight: 700;
+    background-color: #FFFFFF; color: #174E89;
+    border: 1px solid #D5DFEA; border-radius: 10px;
+    padding: 8px 16px; text-align: center;
+    font-size: 11px; font-weight: 800;
 }
-QPushButton#excelBackButton:hover { color: #0A315D; }
+QPushButton#excelBackButton:hover {
+    background-color: #EAF3FC; color: #0A4D91;
+    border-color: #8EB4DA;
+}
+QPushButton#excelBackButton:pressed {
+    background-color: #D9EAF9; color: #073A6F;
+    border-color: #5E94C8;
+}
 QFrame#excelSetupCard, QFrame#excelStepRow {
     background: transparent; border: none;
 }
@@ -400,17 +409,52 @@ QLabel#configurationSummary {
 }
 QComboBox {
     background-color: #FFFFFF; color: #16314F; border: 1px solid #CDD6E1;
-    border-radius: 3px; padding: 7px 10px; min-height: 20px; font-size: 11px;
+    border-radius: 7px; padding: 7px 38px 7px 11px; min-height: 22px; font-size: 11px;
 }
-QComboBox:focus { border: 2px solid #1B63AF; padding: 6px 9px; }
+QComboBox:focus { border: 2px solid #1B63AF; padding: 6px 37px 6px 10px; }
+QComboBox:hover { border-color: #7FA7D2; background-color: #FBFDFF; }
+QComboBox::drop-down {
+    subcontrol-origin: padding; subcontrol-position: top right;
+    width: 32px; border-left: 1px solid #E0E6ED;
+    background-color: #F2F6FA; border-top-right-radius: 7px;
+    border-bottom-right-radius: 7px;
+}
+QComboBox::drop-down:hover { background-color: #E7F1FA; }
+QComboBox::down-arrow { width: 10px; height: 7px; }
+QComboBox QAbstractItemView {
+    background-color: #FFFFFF; color: #183455;
+    border: 1px solid #BFCBDC; border-radius: 9px;
+    padding: 6px; outline: 0px; font-size: 11px;
+    selection-background-color: #E4EFFB;
+    selection-color: #0A4D91;
+}
+QComboBox QAbstractItemView::item {
+    min-height: 32px; padding: 5px 10px;
+    border: none; border-radius: 6px;
+}
+QComboBox QAbstractItemView::item:hover {
+    background-color: #F0F5FA; color: #0A4D91;
+}
+QComboBox QScrollBar:vertical {
+    background: #F3F6F9; width: 9px; margin: 5px 2px 5px 0px;
+    border: none; border-radius: 4px;
+}
+QComboBox QScrollBar::handle:vertical {
+    background: #AFC0D3; min-height: 26px; border-radius: 4px;
+}
+QComboBox QScrollBar::add-line:vertical,
+QComboBox QScrollBar::sub-line:vertical { height: 0px; }
 QLabel#selectedCsvLabel {
     background-color: #FFFFFF; color: #68778B; border: 1px solid #CBD5E1;
     border-radius: 3px; padding: 8px 10px; font-size: 10px;
 }
 QLabel#destinationTitle { color: #164E87; font-size: 9px; font-weight: 900; padding-top: 3px; }
 QLabel#destinationPath { color: #355B80; border-top: 1px solid #D6E0EA; padding-top: 6px; font-size: 10px; }
-QScrollArea#excelStepsScroll { background: transparent; border: none; }
-QScrollArea#excelStepsScroll > QWidget > QWidget { background: transparent; }
+QFrame#excelStepsContainer {
+    background-color: #FFFFFF; border: 1px solid #D7E0E9;
+    border-top: none; border-bottom-left-radius: 10px;
+    border-bottom-right-radius: 10px;
+}
 QLabel#excelStepTitle { color: #102A49; font-size: 12px; font-weight: 800; }
 QLabel#excelStepDescription { color: #748195; font-size: 10px; }
 QFrame#stepsColumnsHeader { background-color: #E7EDF3; border: none; }

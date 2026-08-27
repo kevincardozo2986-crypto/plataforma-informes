@@ -1,6 +1,7 @@
 """Creación progresiva y consulta del libro Excel de trabajo."""
 
 import re
+import gc
 import shutil
 import tempfile
 from collections import defaultdict
@@ -13,10 +14,22 @@ from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
+from app.services.chart_service import (
+    agregar_docentes_dg_xlsxwriter,
+    agregar_estudiantes_dg2_xlsxwriter,
+    agregar_estudiantes_dg_xlsxwriter,
+)
+
 
 SHEET_NAMES = (
     "Original",
     "Tabla Dinamica Docentes",
+    "Docentes DG",
+    "Tabla Dinamica Estudiantes",
+    "Estudiantes DG",
+    "Estudiantes DG2",
+    "Tabla Dinamica Actividades",
+    "Diseño de Cursos",
 )
 
 MESES_ABREVIADOS = {
@@ -304,7 +317,7 @@ class ExcelProcess:
             )
             filas[-1].append(sum(filas[-1][2:]))
         promedios_mensuales = [
-            round(sum(fila[indice + 2] for fila in filas) / len(filas), 2)
+            round(sum(fila[indice + 2] for fila in filas) / len(filas), 1)
             for indice in range(len(meses_encontrados))
         ]
         nombre_hoja = "Tabla Dinamica Docentes"
@@ -350,7 +363,7 @@ class ExcelProcess:
                 "valign": "vcenter",
                 "top": 1,
                 "top_color": "#0A4D91",
-                "num_format": "0.00",
+                "num_format": "0.0",
             }
         )
         try:
@@ -393,7 +406,7 @@ class ExcelProcess:
                     indice_fila, len(encabezados) - 1, fila[-1], formato_total
                 )
             fila_promedio = len(filas) + 1
-            tabla_salida.write(fila_promedio, 0, "PROMEDIO", formato_promedio)
+            tabla_salida.write(fila_promedio, 0, "TOTAL GENERAL", formato_promedio)
             tabla_salida.write(fila_promedio, 1, "", formato_promedio)
             tabla_salida.write_row(
                 fila_promedio, 2, promedios_mensuales, formato_promedio
@@ -428,6 +441,711 @@ class ExcelProcess:
         libro_excel.close()
         return nombres_hojas
 
+    def crear_grafica_docentes(self, programa, periodo, progress_callback=None):
+        """Agrega Docentes DG copiando el libro por streaming para archivos grandes."""
+        if not self.exists:
+            raise FileNotFoundError("Todavía no existe un Excel de trabajo.")
+        if progress_callback:
+            progress_callback(3)
+        libro_lectura = load_workbook(self.path, read_only=True, data_only=True)
+        if "Tabla Dinamica Docentes" not in libro_lectura.sheetnames:
+            libro_lectura.close()
+            raise ValueError(
+                "No existe la hoja 'Tabla Dinamica Docentes'. Créala antes de generar la gráfica."
+            )
+
+        tabla = libro_lectura["Tabla Dinamica Docentes"]
+        encabezados = [str(celda.value or "").strip() for celda in tabla[1]]
+        meses_validos = set(MESES_ABREVIADOS.values())
+        columnas_mensuales = [
+            (indice, nombre.upper())
+            for indice, nombre in enumerate(encabezados)
+            if nombre.upper() in meses_validos
+        ]
+        if not columnas_mensuales:
+            libro_lectura.close()
+            raise ValueError(
+                "La hoja 'Tabla Dinamica Docentes' no contiene columnas mensuales."
+            )
+        valores_por_mes = {mes: [] for _, mes in columnas_mensuales}
+        for fila in tabla.iter_rows(min_row=2, values_only=True):
+            etiqueta = str(fila[0] or "").strip().upper()
+            if etiqueta in {"PROMEDIO", "TOTAL GENERAL"}:
+                continue
+            for indice, mes in columnas_mensuales:
+                valor = fila[indice] if indice < len(fila) else None
+                if isinstance(valor, (int, float)) and not isinstance(valor, bool):
+                    valores_por_mes[mes].append(float(valor))
+        promedios = [
+            (mes, round(sum(valores) / len(valores), 1))
+            for mes, valores in valores_por_mes.items()
+            if valores
+        ]
+        if not promedios:
+            libro_lectura.close()
+            raise ValueError(
+                "Las columnas mensuales no contienen valores numéricos para calcular promedios."
+            )
+
+        ruta_nueva = self.path.with_name("informe_con_grafica.xlsx")
+        libro_salida = xlsxwriter.Workbook(
+            ruta_nueva,
+            {"constant_memory": True, "strings_to_urls": False},
+        )
+        formato_encabezado = libro_salida.add_format(
+            {"bold": True, "font_color": "#FFFFFF", "bg_color": "#0A3A6B", "align": "center"}
+        )
+        formato_centrado = libro_salida.add_format(
+            {"align": "center", "valign": "vcenter"}
+        )
+        formato_total = libro_salida.add_format(
+            {
+                "bold": True, "bg_color": "#E7F1FA",
+                "font_color": "#0A3A6B", "align": "center",
+            }
+        )
+        formato_promedio = libro_salida.add_format(
+            {
+                "bold": True, "bg_color": "#DDEAF6",
+                "font_color": "#0A3A6B", "align": "center",
+                "top": 1, "top_color": "#0A4D91", "num_format": "0.0",
+            }
+        )
+        total_filas = sum(
+            max(libro_lectura[nombre].max_row or 1, 1)
+            for nombre in libro_lectura.sheetnames
+            if nombre != "Docentes DG"
+        )
+        copiadas = 0
+        try:
+            for nombre in libro_lectura.sheetnames:
+                if nombre == "Docentes DG":
+                    continue
+                origen = libro_lectura[nombre]
+                destino = libro_salida.add_worksheet(nombre)
+                for indice_fila, fila in enumerate(origen.iter_rows(values_only=True)):
+                    valores = [self._excel_value(valor) for valor in fila]
+                    if indice_fila == 0:
+                        destino.write_row(indice_fila, 0, valores, formato_encabezado)
+                    elif nombre == "Tabla Dinamica Docentes":
+                        es_promedio = str(valores[0] or "").strip().upper() in {
+                            "PROMEDIO", "TOTAL GENERAL"
+                        }
+                        if es_promedio:
+                            destino.write_row(indice_fila, 0, valores, formato_promedio)
+                        else:
+                            destino.write(indice_fila, 0, valores[0])
+                            destino.write(indice_fila, 1, valores[1])
+                            destino.write_row(indice_fila, 2, valores[2:-1], formato_centrado)
+                            destino.write(indice_fila, len(valores) - 1, valores[-1], formato_total)
+                    else:
+                        destino.write_row(indice_fila, 0, valores)
+                    copiadas += 1
+                    if progress_callback and copiadas % 2_000 == 0:
+                        progress_callback(min(5 + int(copiadas * 85 / total_filas), 90))
+                destino.freeze_panes(1, 2 if nombre == "Tabla Dinamica Docentes" else 0)
+                if nombre == "Original" and origen.max_column:
+                    destino.autofilter(0, 0, max((origen.max_row or 1) - 1, 0), origen.max_column - 1)
+                    for indice, encabezado in enumerate(encabezados if nombre == "Tabla Dinamica Docentes" else [c.value for c in origen[1]]):
+                        ancho = min(max(len(str(encabezado or "")) + 2, 11), 30)
+                        destino.set_column(indice, indice, ancho)
+                elif nombre == "Tabla Dinamica Docentes":
+                    destino.set_column(0, 0, 42)
+                    destino.set_column(1, 1, 34)
+                    destino.set_column(2, max(origen.max_column - 1, 2), 14)
+                    destino.autofilter(0, 0, max((origen.max_row or 2) - 2, 0), origen.max_column - 1)
+            agregar_docentes_dg_xlsxwriter(
+                libro_salida, promedios, programa, periodo
+            )
+            if progress_callback:
+                progress_callback(94)
+        finally:
+            libro_lectura.close()
+            libro_salida.close()
+        ruta_nueva.replace(self.path)
+        self._row_counts["Docentes DG"] = len(promedios)
+        if progress_callback:
+            progress_callback(100)
+        return promedios
+
+    def crear_tabla_estudiantes(self, programa, periodo, progress_callback=None):
+        """Crea días y estudiantes únicos por curso/mes leyendo Original por streaming."""
+        if not self.exists:
+            raise FileNotFoundError("Todavía no existe un Excel de trabajo.")
+        libro_lectura = load_workbook(self.path, read_only=True, data_only=True)
+        if "Original" not in libro_lectura.sheetnames:
+            libro_lectura.close()
+            raise ValueError("No existe la hoja 'Original'.")
+        original = libro_lectura["Original"]
+        filas = original.iter_rows(values_only=True)
+        encabezados = next(filas, None)
+        if not encabezados:
+            libro_lectura.close()
+            raise ValueError("La hoja Original está vacía.")
+        columnas = {
+            str(nombre or "").strip().casefold(): indice
+            for indice, nombre in enumerate(encabezados)
+        }
+        requeridas = ("rol", "curso", "mes", "dia", "idusuario")
+        faltantes = [nombre for nombre in requeridas if nombre not in columnas]
+        if faltantes:
+            libro_lectura.close()
+            raise ValueError(
+                "La hoja Original no contiene las columnas requeridas: "
+                + ", ".join(faltantes)
+            )
+
+        dias = defaultdict(lambda: defaultdict(set))
+        estudiantes = defaultdict(lambda: defaultdict(set))
+        total_original = max((original.max_row or 1) - 1, 1)
+        for numero, fila in enumerate(filas, 1):
+            if str(fila[columnas["rol"]] or "").strip().casefold() != "student":
+                continue
+            curso = str(fila[columnas["curso"]] or "").strip()
+            usuario = fila[columnas["idusuario"]]
+            try:
+                mes = int(float(fila[columnas["mes"]]))
+                dia = int(float(fila[columnas["dia"]]))
+            except (TypeError, ValueError):
+                continue
+            if not curso or usuario in (None, "") or not 1 <= mes <= 12 or not 1 <= dia <= 31:
+                continue
+            dias[curso][mes].add(dia)
+            estudiantes[curso][mes].add(str(usuario).strip())
+            if progress_callback and numero % 5_000 == 0:
+                progress_callback(min(5 + int(numero * 42 / total_original), 47))
+        if not dias:
+            libro_lectura.close()
+            raise ValueError("No se encontraron registros con rol 'student' en Original.")
+
+        meses = sorted({mes for cursos in dias.values() for mes in cursos})
+        cursos = sorted(dias, key=str.casefold)
+        ruta_nueva = self.path.with_name("informe_con_estudiantes.xlsx")
+        libro_salida = xlsxwriter.Workbook(
+            ruta_nueva, {"constant_memory": True, "strings_to_urls": False}
+        )
+        formato_encabezado = libro_salida.add_format(
+            {"bold": True, "font_color": "#FFFFFF", "bg_color": "#0A3A6B", "align": "center", "valign": "vcenter"}
+        )
+        formato_subencabezado = libro_salida.add_format(
+            {"bold": True, "font_color": "#FFFFFF", "bg_color": "#1767A6", "align": "center", "valign": "vcenter"}
+        )
+        formato_mes = libro_salida.add_format(
+            {"bold": True, "font_color": "#FFFFFF", "bg_color": "#0A3A6B", "align": "center_across", "valign": "vcenter"}
+        )
+        formato_numero = libro_salida.add_format({"align": "center", "valign": "vcenter"})
+        formato_total = libro_salida.add_format(
+            {"bold": True, "bg_color": "#E7F1FA", "font_color": "#0A3A6B", "align": "center"}
+        )
+        formato_resumen = libro_salida.add_format(
+            {"bold": True, "bg_color": "#DDEAF6", "font_color": "#0A3A6B", "align": "center", "top": 1, "num_format": "0.0"}
+        )
+        hojas_copiadas = [
+            n for n in libro_lectura.sheetnames
+            if n not in {"Tabla Dinamica Estudiantes", "Estudiantes DG", "Estudiantes DG2"}
+        ]
+        total_copia = sum(max(libro_lectura[n].max_row or 1, 1) for n in hojas_copiadas)
+        copiadas = 0
+        try:
+            for nombre in hojas_copiadas:
+                origen = libro_lectura[nombre]
+                if nombre == "Docentes DG":
+                    valores_dg = [
+                        (str(fila[0]), float(fila[1]))
+                        for fila in origen.iter_rows(min_row=2, values_only=True)
+                        if fila[0] not in (None, "") and isinstance(fila[1], (int, float))
+                    ]
+                    agregar_docentes_dg_xlsxwriter(libro_salida, valores_dg, programa, periodo)
+                    copiadas += max(origen.max_row or 1, 1)
+                    continue
+                destino = libro_salida.add_worksheet(nombre)
+                for indice_fila, valores in enumerate(origen.iter_rows(values_only=True)):
+                    valores_limpios = [self._excel_value(valor) for valor in valores]
+                    if indice_fila == 0:
+                        destino.write_row(indice_fila, 0, valores_limpios, formato_encabezado)
+                    elif nombre == "Tabla Dinamica Docentes":
+                        es_resumen = str(valores_limpios[0] or "").strip().upper() in {
+                            "PROMEDIO", "TOTAL GENERAL"
+                        }
+                        if es_resumen:
+                            destino.write_row(indice_fila, 0, valores_limpios, formato_resumen)
+                        else:
+                            destino.write(indice_fila, 0, valores_limpios[0])
+                            destino.write(indice_fila, 1, valores_limpios[1])
+                            destino.write_row(indice_fila, 2, valores_limpios[2:-1], formato_numero)
+                            destino.write(indice_fila, len(valores_limpios) - 1, valores_limpios[-1], formato_total)
+                    else:
+                        destino.write_row(indice_fila, 0, valores_limpios)
+                    copiadas += 1
+                    if progress_callback and copiadas % 2_000 == 0:
+                        progress_callback(min(48 + int(copiadas * 40 / total_copia), 88))
+                destino.freeze_panes(1, 2 if nombre == "Tabla Dinamica Docentes" else 0)
+                if nombre == "Original" and origen.max_column:
+                    destino.autofilter(0, 0, max((origen.max_row or 1) - 1, 0), origen.max_column - 1)
+                    for indice, encabezado in enumerate(encabezados):
+                        ancho = min(max(len(str(encabezado or "")) + 2, 11), 30)
+                        destino.set_column(indice, indice, ancho)
+                elif nombre == "Tabla Dinamica Docentes":
+                    destino.set_column(0, 0, 42)
+                    destino.set_column(1, 1, 34)
+                    destino.set_column(2, max(origen.max_column - 1, 2), 14)
+                    destino.autofilter(0, 0, max((origen.max_row or 2) - 2, 0), origen.max_column - 1)
+
+            hoja = libro_salida.add_worksheet("Tabla Dinamica Estudiantes")
+            cantidad_meses = len(meses)
+            columna_dias = 1
+            columna_total_dias = columna_dias + cantidad_meses
+            columna_estudiantes = columna_total_dias + 1
+            columna_total_estudiantes = columna_estudiantes + cantidad_meses
+            columna_indicador = columna_total_estudiantes + 2
+            fila_datos = 3
+            fila_total = fila_datos + len(cursos)
+            fila_indicadores = fila_total + 3
+            formato_decimal = libro_salida.add_format(
+                {"align": "center", "valign": "vcenter", "num_format": "0.0"}
+            )
+
+            hoja.write(0, 0, "rol")
+            hoja.write(0, 1, "student")
+            hoja.write(1, 0, "CURSO", formato_encabezado)
+            hoja.write(1, columna_dias, "DÍAS", formato_mes)
+            for columna in range(columna_dias + 1, columna_total_dias + 1):
+                hoja.write_blank(1, columna, None, formato_mes)
+            hoja.write(1, columna_estudiantes, "ESTUDIANTES", formato_mes)
+            for columna in range(columna_estudiantes + 1, columna_total_estudiantes + 1):
+                hoja.write_blank(1, columna, None, formato_mes)
+            hoja.write_blank(2, 0, None, formato_subencabezado)
+            for posicion, mes in enumerate(meses):
+                hoja.write(2, columna_dias + posicion, MESES_ABREVIADOS[mes], formato_subencabezado)
+            hoja.write(2, columna_total_dias, "TOTAL", formato_subencabezado)
+            for posicion, mes in enumerate(meses):
+                hoja.write(2, columna_estudiantes + posicion, MESES_ABREVIADOS[mes], formato_subencabezado)
+            hoja.write(2, columna_total_estudiantes, "TOTAL", formato_subencabezado)
+
+            totales_dias = []
+            totales_estudiantes = []
+            for indice_fila, curso in enumerate(cursos, fila_datos):
+                hoja.write(indice_fila, 0, curso)
+                valores_dias = [len(dias[curso][mes]) for mes in meses]
+                valores_estudiantes = [len(estudiantes[curso][mes]) for mes in meses]
+                hoja.write_row(indice_fila, columna_dias, valores_dias, formato_numero)
+                total_dias = sum(valores_dias)
+                total_estudiantes = sum(valores_estudiantes)
+                totales_dias.append(total_dias)
+                totales_estudiantes.append(total_estudiantes)
+                numero_excel = indice_fila + 1
+                hoja.write_formula(
+                    indice_fila, columna_total_dias,
+                    f"=SUM({get_column_letter(columna_dias + 1)}{numero_excel}:{get_column_letter(columna_total_dias)}{numero_excel})",
+                    formato_numero, total_dias,
+                )
+                hoja.write_row(indice_fila, columna_estudiantes, valores_estudiantes, formato_numero)
+                hoja.write_formula(
+                    indice_fila, columna_total_estudiantes,
+                    f"=SUM({get_column_letter(columna_estudiantes + 1)}{numero_excel}:{get_column_letter(columna_total_estudiantes)}{numero_excel})",
+                    formato_numero, total_estudiantes,
+                )
+                if indice_fila == fila_datos:
+                    inicio_excel = fila_datos + 1
+                    fin_excel = fila_total
+                    hoja.write_formula(
+                        indice_fila, columna_indicador,
+                        f"=MAX({get_column_letter(columna_total_dias + 1)}{inicio_excel}:{get_column_letter(columna_total_dias + 1)}{fin_excel})",
+                        formato_numero, max(totales_dias + [sum(len(dias[c][m]) for m in meses) for c in cursos[1:]]),
+                    )
+
+            hoja.write(fila_total, 0, "TOTAL GENERAL", formato_resumen)
+            promedios_dias = []
+            promedios_estudiantes = []
+            for posicion, mes in enumerate(meses):
+                valores = [len(dias[curso][mes]) for curso in cursos]
+                promedio = sum(valores) / len(cursos)
+                promedios_dias.append(promedio)
+                columna = columna_dias + posicion
+                hoja.write_formula(
+                    fila_total, columna,
+                    f"=AVERAGE({get_column_letter(columna + 1)}{fila_datos + 1}:{get_column_letter(columna + 1)}{fila_total})",
+                    formato_resumen, promedio,
+                )
+            hoja.write_formula(
+                fila_total, columna_total_dias,
+                f"=AVERAGE({get_column_letter(columna_total_dias + 1)}{fila_datos + 1}:{get_column_letter(columna_total_dias + 1)}{fila_total})",
+                formato_resumen, sum(totales_dias) / len(cursos),
+            )
+            for posicion, mes in enumerate(meses):
+                valores = [len(estudiantes[curso][mes]) for curso in cursos]
+                promedio = sum(valores) / len(cursos)
+                promedios_estudiantes.append(promedio)
+                columna = columna_estudiantes + posicion
+                hoja.write_formula(
+                    fila_total, columna,
+                    f"=AVERAGE({get_column_letter(columna + 1)}{fila_datos + 1}:{get_column_letter(columna + 1)}{fila_total})",
+                    formato_resumen, promedio,
+                )
+            hoja.write_formula(
+                fila_total, columna_total_estudiantes,
+                f"=AVERAGE({get_column_letter(columna_total_estudiantes + 1)}{fila_datos + 1}:{get_column_letter(columna_total_estudiantes + 1)}{fila_total})",
+                formato_resumen, sum(totales_estudiantes) / len(cursos),
+            )
+            hoja.write_formula(
+                fila_indicadores, columna_dias,
+                f"=AVERAGE({get_column_letter(columna_dias + 1)}{fila_total + 1}:{get_column_letter(columna_total_dias)}{fila_total + 1})",
+                formato_decimal, sum(promedios_dias) / cantidad_meses,
+            )
+            hoja.write_formula(
+                fila_indicadores, columna_estudiantes,
+                f"=AVERAGE({get_column_letter(columna_estudiantes + 1)}{fila_total + 1}:{get_column_letter(columna_total_estudiantes)}{fila_total + 1})",
+                formato_decimal, sum(promedios_estudiantes) / cantidad_meses,
+            )
+            hoja.write_comment(fila_datos, columna_indicador, "Máximo del total de días por curso")
+            hoja.write_comment(fila_indicadores, columna_dias, "Promedio general mensual de días")
+            hoja.write_comment(fila_indicadores, columna_estudiantes, "Promedio general mensual de estudiantes")
+            hoja.set_column(0, 0, 48)
+            hoja.set_column(1, columna_total_estudiantes, 12)
+            hoja.set_column(columna_indicador, columna_indicador, 12)
+            hoja.freeze_panes(3, 1)
+            hoja.autofilter(2, 0, fila_total - 1, columna_total_estudiantes)
+            if progress_callback:
+                progress_callback(94)
+        finally:
+            libro_lectura.close()
+            libro_salida.close()
+        ruta_nueva.replace(self.path)
+        self._row_counts["Tabla Dinamica Estudiantes"] = fila_indicadores
+        if progress_callback:
+            progress_callback(100)
+        return len(cursos), [MESES_ABREVIADOS[mes] for mes in meses]
+
+    def crear_grafica_estudiantes(
+        self, programa, periodo, progress_callback=None, resumen_actividades=None,
+        diseno_cursos=None,
+    ):
+        """Crea Estudiantes DG conservando fórmulas y hojas mediante copia incremental."""
+        if not self.exists:
+            raise FileNotFoundError("Todavía no existe un Excel de trabajo.")
+        libro_formulas = load_workbook(self.path, read_only=True, data_only=False)
+        libro_valores = load_workbook(self.path, read_only=True, data_only=True)
+        nombre_tabla = "Tabla Dinamica Estudiantes"
+        if nombre_tabla not in libro_formulas.sheetnames:
+            libro_formulas.close()
+            libro_valores.close()
+            raise ValueError(f"No existe la hoja '{nombre_tabla}'.")
+        tabla_valores = libro_valores[nombre_tabla]
+        filas_tabla = list(tabla_valores.iter_rows(values_only=True))
+        encabezados = list(filas_tabla[2]) if len(filas_tabla) >= 3 else []
+        try:
+            columna_total_dias = encabezados.index("TOTAL")
+        except ValueError:
+            libro_formulas.close()
+            libro_valores.close()
+            raise ValueError("La tabla de estudiantes no contiene el bloque mensual de DÍAS.")
+        columna_inicio = 1
+        cantidad_meses = columna_total_dias - columna_inicio
+        columna_inicio_estudiantes = columna_total_dias + 1
+        fila_resumen = next(
+            (
+                indice for indice, fila in enumerate(filas_tabla)
+                if str((fila[0] if fila else None) or "").strip().upper()
+                == "TOTAL GENERAL"
+            ),
+            None,
+        )
+        if cantidad_meses <= 0 or fila_resumen is None:
+            libro_formulas.close()
+            libro_valores.close()
+            raise ValueError("No se encontraron meses o la fila TOTAL GENERAL de estudiantes.")
+
+        ruta_nueva = self.path.with_name("informe_con_grafica_estudiantes.xlsx")
+        libro_salida = xlsxwriter.Workbook(
+            ruta_nueva, {"constant_memory": True, "strings_to_urls": False}
+        )
+        formato_encabezado = libro_salida.add_format(
+            {"bold": True, "font_color": "#FFFFFF", "bg_color": "#0A3A6B", "align": "center", "valign": "vcenter"}
+        )
+        formato_subencabezado = libro_salida.add_format(
+            {"bold": True, "font_color": "#FFFFFF", "bg_color": "#1767A6", "align": "center", "valign": "vcenter"}
+        )
+        formato_numero = libro_salida.add_format({"align": "center", "valign": "vcenter"})
+        formato_total = libro_salida.add_format(
+            {"bold": True, "bg_color": "#E7F1FA", "font_color": "#0A3A6B", "align": "center"}
+        )
+        formato_resumen = libro_salida.add_format(
+            {"bold": True, "bg_color": "#DDEAF6", "font_color": "#0A3A6B", "align": "center", "top": 1, "num_format": "0.0"}
+        )
+        hojas_excluidas = {"Estudiantes DG", "Estudiantes DG2"}
+        if resumen_actividades is not None:
+            hojas_excluidas.add("Tabla Dinamica Actividades")
+        if diseno_cursos is not None:
+            hojas_excluidas.add("Diseño de Cursos")
+        nombres = [n for n in libro_formulas.sheetnames if n not in hojas_excluidas]
+        total_copia = sum(max(libro_formulas[n].max_row or 1, 1) for n in nombres)
+        copiadas = 0
+        try:
+            for nombre in nombres:
+                origen = libro_formulas[nombre]
+                origen_valores = libro_valores[nombre]
+                if nombre == "Docentes DG":
+                    valores_dg = [
+                        (str(fila[0]), float(fila[1]))
+                        for fila in origen_valores.iter_rows(min_row=2, values_only=True)
+                        if fila[0] not in (None, "") and isinstance(fila[1], (int, float))
+                    ]
+                    agregar_docentes_dg_xlsxwriter(libro_salida, valores_dg, programa, periodo)
+                    copiadas += max(origen.max_row or 1, 1)
+                    continue
+                destino = libro_salida.add_worksheet(nombre)
+                filas_valores = origen_valores.iter_rows(values_only=True)
+                for indice_fila, fila in enumerate(origen.iter_rows(values_only=True)):
+                    cache = next(filas_valores, ())
+                    for indice_columna, valor in enumerate(fila):
+                        valor_limpio = self._excel_value(valor)
+                        formato = None
+                        if indice_fila == 0 and nombre != nombre_tabla:
+                            formato = formato_encabezado
+                        elif nombre == "Tabla Dinamica Docentes":
+                            etiqueta = str(fila[0] or "").strip().upper()
+                            formato = formato_resumen if etiqueta in {"PROMEDIO", "TOTAL GENERAL"} else (
+                                formato_total if indice_columna == len(fila) - 1 else
+                                (formato_numero if indice_columna >= 2 else None)
+                            )
+                        elif nombre == nombre_tabla:
+                            if indice_fila == 1:
+                                formato = formato_encabezado
+                            elif indice_fila == 2:
+                                formato = formato_subencabezado
+                            elif indice_fila == fila_resumen:
+                                formato = formato_resumen
+                            elif indice_fila >= 3 and indice_columna >= 1:
+                                formato = formato_numero
+                        if isinstance(valor_limpio, str) and valor_limpio.startswith("="):
+                            cache_valor = cache[indice_columna] if indice_columna < len(cache) else 0
+                            destino.write_formula(
+                                indice_fila, indice_columna, valor_limpio,
+                                formato, 0 if cache_valor is None else cache_valor,
+                            )
+                        else:
+                            destino.write(indice_fila, indice_columna, valor_limpio, formato)
+                    copiadas += 1
+                    if progress_callback and copiadas % 2_000 == 0:
+                        progress_callback(min(5 + int(copiadas * 87 / total_copia), 92))
+                if nombre == "Original":
+                    destino.freeze_panes(1, 0)
+                    if origen.max_column:
+                        destino.autofilter(0, 0, max((origen.max_row or 1) - 1, 0), origen.max_column - 1)
+                elif nombre == "Tabla Dinamica Docentes":
+                    destino.freeze_panes(1, 2)
+                    destino.set_column(0, 0, 42)
+                    destino.set_column(1, 1, 34)
+                    destino.set_column(2, max(origen.max_column - 1, 2), 14)
+                elif nombre == nombre_tabla:
+                    destino.freeze_panes(3, 1)
+                    destino.set_column(0, 0, 48)
+                    destino.set_column(1, max(origen.max_column - 1, 1), 12)
+
+            agregar_estudiantes_dg_xlsxwriter(
+                libro_salida, nombre_tabla, fila_resumen, columna_inicio,
+                cantidad_meses, programa, periodo,
+            )
+            agregar_estudiantes_dg2_xlsxwriter(
+                libro_salida, nombre_tabla, fila_resumen,
+                columna_inicio_estudiantes, cantidad_meses, programa, periodo,
+            )
+            if resumen_actividades is not None:
+                self._escribir_tabla_actividades(libro_salida, resumen_actividades)
+            if diseno_cursos is not None:
+                self._escribir_diseno_cursos(libro_salida, *diseno_cursos)
+            if progress_callback:
+                progress_callback(96)
+        finally:
+            libro_formulas.close()
+            libro_valores.close()
+            libro_salida.close()
+            tabla_valores = None
+            origen = None
+            origen_valores = None
+            filas_valores = None
+            gc.collect()
+        ruta_nueva.replace(self.path)
+        self._row_counts["Estudiantes DG"] = 0
+        self._row_counts["Estudiantes DG2"] = 0
+        if resumen_actividades is not None:
+            self._row_counts["Tabla Dinamica Actividades"] = len(resumen_actividades)
+        if diseno_cursos is not None:
+            self._row_counts["Diseño de Cursos"] = 1
+        if progress_callback:
+            progress_callback(100)
+        return [str(valor) for valor in encabezados[columna_inicio:columna_total_dias]]
+
+    def crear_tabla_actividades(self, programa, periodo, progress_callback=None):
+        """Cuenta registros por curso y acción para todos los roles de Original."""
+        if not self.exists:
+            raise FileNotFoundError("Todavía no existe un Excel de trabajo.")
+        libro = load_workbook(self.path, read_only=True, data_only=True)
+        if "Original" not in libro.sheetnames:
+            libro.close()
+            raise ValueError("No existe la hoja 'Original'.")
+        hoja = libro["Original"]
+        filas = hoja.iter_rows(values_only=True)
+        encabezados = next(filas, None)
+        columnas = {
+            str(valor or "").strip().casefold(): indice
+            for indice, valor in enumerate(encabezados or ())
+        }
+        faltantes = [nombre for nombre in ("curso", "accion", "rol") if nombre not in columnas]
+        if faltantes:
+            libro.close()
+            raise ValueError(
+                "La hoja Original no contiene las columnas requeridas: "
+                + ", ".join(faltantes)
+            )
+        resumen = defaultdict(lambda: defaultdict(int))
+        total = max((hoja.max_row or 1) - 1, 1)
+        try:
+            for indice, fila in enumerate(filas, 1):
+                curso = str(fila[columnas["curso"]] or "").strip()
+                accion = str(fila[columnas["accion"]] or "").strip().casefold()
+                if curso and accion:
+                    resumen[curso][accion] += 1
+                if progress_callback and indice % 5_000 == 0:
+                    progress_callback(min(5 + int(indice * 40 / total), 45))
+        finally:
+            libro.close()
+        if not resumen:
+            raise ValueError("No se encontraron cursos con acciones en la hoja Original.")
+        self.crear_grafica_estudiantes(
+            programa, periodo,
+            (lambda valor: progress_callback(45 + int(valor * 0.54)))
+            if progress_callback else None,
+            resumen,
+        )
+        if progress_callback:
+            progress_callback(100)
+        acciones = sorted({accion for valores in resumen.values() for accion in valores})
+        return len(resumen), acciones
+
+    @staticmethod
+    def _escribir_tabla_actividades(libro, resumen):
+        """Escribe la tabla equivalente a la dinámica del informe de referencia."""
+        hoja = libro.add_worksheet("Tabla Dinamica Actividades")
+        acciones = sorted({accion for valores in resumen.values() for accion in valores})
+        azul = libro.add_format(
+            {"bold": True, "font_color": "#FFFFFF", "bg_color": "#0A3A6B", "align": "center"}
+        )
+        subazul = libro.add_format(
+            {"bold": True, "font_color": "#FFFFFF", "bg_color": "#1767A6", "align": "center"}
+        )
+        numero = libro.add_format({"align": "center", "num_format": "0"})
+        total_fmt = libro.add_format(
+            {"bold": True, "font_color": "#082B55", "bg_color": "#DDEAF6", "align": "center", "top": 1}
+        )
+        hoja.write_row(0, 0, ["rol", "All"], azul)
+        hoja.write_row(2, 0, ["Recuento de accion", "Etiquetas de columna"], azul)
+        hoja.write_row(3, 0, ["Etiquetas de fila", *acciones, "Total general"], subazul)
+        totales = {accion: 0 for accion in acciones}
+        for fila, curso in enumerate(sorted(resumen, key=str.casefold), 4):
+            hoja.write(fila, 0, curso)
+            total_curso = 0
+            for columna, accion in enumerate(acciones, 1):
+                valor = resumen[curso].get(accion, 0)
+                if valor:
+                    hoja.write_number(fila, columna, valor, numero)
+                total_curso += valor
+                totales[accion] += valor
+            hoja.write_number(fila, len(acciones) + 1, total_curso, total_fmt)
+        fila_total = 4 + len(resumen)
+        hoja.write(fila_total, 0, "Total general", total_fmt)
+        for columna, accion in enumerate(acciones, 1):
+            hoja.write_number(fila_total, columna, totales[accion], total_fmt)
+        hoja.write_number(fila_total, len(acciones) + 1, sum(totales.values()), total_fmt)
+        hoja.set_column(0, 0, 48)
+        hoja.set_column(1, len(acciones) + 1, 15)
+        hoja.freeze_panes(4, 1)
+        hoja.autofilter(3, 0, fila_total - 1, len(acciones) + 1)
+
+    def crear_diseno_cursos(self, programa, periodo, progress_callback=None):
+        """Resume los cursos unificados y los cursos con o sin actividad."""
+        if not self.exists:
+            raise FileNotFoundError("Todavía no existe un Excel de trabajo.")
+        libro = load_workbook(self.path, read_only=True, data_only=True)
+        nombre = "Tabla Dinamica Actividades"
+        if nombre not in libro.sheetnames:
+            libro.close()
+            raise ValueError(f"No existe la hoja '{nombre}'.")
+        hoja = libro[nombre]
+        encabezados = [str(hoja.cell(4, columna).value or "").strip() for columna in range(1, hoja.max_column + 1)]
+        acciones = encabezados[1:-1]
+        resumen = defaultdict(lambda: defaultdict(int))
+        for fila in range(5, hoja.max_row + 1):
+            curso = str(hoja.cell(fila, 1).value or "").strip()
+            if not curso or curso.casefold() == "total general":
+                continue
+            for columna, accion in enumerate(acciones, 2):
+                valor = hoja.cell(fila, columna).value
+                if isinstance(valor, (int, float)) and valor:
+                    resumen[curso][accion.casefold()] = int(valor)
+        libro.close()
+        if not resumen:
+            raise ValueError("La tabla de actividades no contiene cursos para evaluar.")
+
+        patron_unificado = re.compile(r"_\d+[A-Z]_\d+[A-Z]$", re.IGNORECASE)
+        unificados = {
+            curso for curso in resumen
+            if patron_unificado.search(curso)
+            and "PRACTICA EMPRESARIAL" not in curso.upper()
+        }
+        cursos_evaluados = [curso for curso in resumen if curso not in unificados]
+        con_contenido = sum(bool(sum(resumen[curso].values())) for curso in cursos_evaluados)
+        sin_contenido = len(cursos_evaluados) - con_contenido
+        indicadores = (len(unificados), sin_contenido, con_contenido)
+        self.crear_grafica_estudiantes(
+            programa, periodo, progress_callback, resumen, indicadores
+        )
+        return indicadores
+
+    @staticmethod
+    def _escribir_diseno_cursos(libro, unificados, sin_contenido, con_contenido):
+        """Crea el resumen final y su gráfico circular institucional."""
+        hoja = libro.add_worksheet("Diseño de Cursos")
+        titulo = libro.add_format(
+            {"bold": True, "font_color": "#FFFFFF", "bg_color": "#082B55", "align": "center", "font_size": 14}
+        )
+        encabezado = libro.add_format(
+            {"bold": True, "font_color": "#FFFFFF", "bg_color": "#1767A6", "align": "center"}
+        )
+        valor = libro.add_format(
+            {"bold": True, "font_color": "#082B55", "bg_color": "#F4F7FB", "align": "center", "font_size": 12, "border": 1, "border_color": "#C7D4E3"}
+        )
+        hoja.merge_range("C4:F4", "Diseño cursos", titulo)
+        hoja.write_row("C5", ["Unificados", "Sin contenido", "Con contenido", "Total"], encabezado)
+        hoja.write_row("C6", [unificados, sin_contenido, con_contenido, sin_contenido + con_contenido], valor)
+        hoja.set_column("A:B", 3)
+        hoja.set_column("C:F", 18)
+        hoja.set_row(3, 26)
+        grafica = libro.add_chart({"type": "pie"})
+        grafica.add_series(
+            {
+                "name": "Diseño de cursos",
+                "categories": ["Diseño de Cursos", 4, 3, 4, 4],
+                "values": ["Diseño de Cursos", 5, 3, 5, 4],
+                "points": [
+                    {"fill": {"color": "#D6A419"}},
+                    {"fill": {"color": "#1767A6"}},
+                ],
+                "data_labels": {
+                    "percentage": True, "category": True,
+                    "leader_lines": True,
+                    "font": {"color": "#082B55", "bold": True},
+                },
+            }
+        )
+        grafica.set_title(
+            {"name": "Diseño de Cursos", "name_font": {"color": "#082B55", "bold": True, "size": 16}}
+        )
+        grafica.set_legend({"position": "bottom"})
+        grafica.set_chartarea({"fill": {"color": "#F4F7FB"}, "border": {"color": "#C7D4E3"}})
+        grafica.set_size({"width": 720, "height": 430})
+        hoja.insert_chart("C8", grafica)
+
     def preview_sheet(self, sheet_name, limit=200):
         libro_excel = load_workbook(self.path, read_only=True, data_only=True)
         try:
@@ -451,6 +1169,29 @@ class ExcelProcess:
         if not self.exists:
             raise FileNotFoundError("Todavía no existe un Excel de trabajo.")
         shutil.copy2(self.path, destination)
+
+    def finalize_as(self, destination):
+        """Guarda el libro definitivo y elimina el temporal solo al finalizar bien."""
+        if not self.exists:
+            raise FileNotFoundError("Todavía no existe un Excel de trabajo.")
+        origen = self.path.resolve()
+        destino = Path(destination).resolve()
+        if origen == destino:
+            return
+        destino.parent.mkdir(parents=True, exist_ok=True)
+        descriptor, nombre_temporal = tempfile.mkstemp(
+            prefix=f".{destino.stem}_", suffix=".xlsx", dir=destino.parent
+        )
+        import os
+        os.close(descriptor)
+        copia_temporal = Path(nombre_temporal)
+        try:
+            shutil.copy2(origen, copia_temporal)
+            copia_temporal.replace(destino)
+            origen.unlink()
+        finally:
+            copia_temporal.unlink(missing_ok=True)
+        self.path = destino
 
 
 def suggested_filename(period, program):

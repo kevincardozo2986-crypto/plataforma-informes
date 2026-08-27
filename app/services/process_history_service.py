@@ -66,14 +66,47 @@ def list_incomplete_processes(usuario):
     return [dict(fila) for fila in filas]
 
 
-def mark_process_completed(workbook_path):
+def list_completed_processes(usuario):
+    """Lista informes finalizados, respetando el alcance del usuario."""
+    if not usuario:
+        return []
+    consulta = """
+        SELECT report_processes.id, report_processes.user_id,
+               report_processes.period, report_processes.level,
+               report_processes.modality, report_processes.program,
+               report_processes.base_directory, report_processes.source_csv,
+               report_processes.workbook_path, report_processes.completed_step,
+               report_processes.status, report_processes.updated_at,
+               users.full_name AS owner_name
+        FROM report_processes
+        JOIN users ON users.id = report_processes.user_id
+        WHERE report_processes.status = 'completed'
+    """
+    parametros = []
+    if usuario.get("role") != "admin":
+        consulta += " AND report_processes.user_id = ?"
+        parametros.append(usuario["id"])
+    consulta += " ORDER BY report_processes.updated_at DESC"
     with get_connection() as conexion:
+        filas = conexion.execute(consulta, parametros).fetchall()
+    return [dict(fila) for fila in filas]
+
+
+def mark_process_completed(workbook_path, saved_path=None):
+    with get_connection() as conexion:
+        ruta_guardada = str(saved_path or workbook_path)
+        if saved_path:
+            conexion.execute(
+                "DELETE FROM report_processes WHERE workbook_path = ? AND workbook_path != ?",
+                (ruta_guardada, str(workbook_path)),
+            )
         conexion.execute(
             """
             UPDATE report_processes
             SET status = 'completed', error_message = NULL,
+                workbook_path = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE workbook_path = ?
             """,
-            (str(workbook_path),),
+            (ruta_guardada, str(workbook_path)),
         )
