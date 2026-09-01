@@ -313,6 +313,11 @@ def test_crea_tabla_dinamica_estudiantes_con_dias_y_usuarios_unicos():
     ]
     assert [diseno.cell(6, columna).value for columna in range(3, 7)] == [0, 0, 2, 2]
     assert len(diseno._charts) == 1
+    resumen = libro["Resumen Informe"]
+    assert resumen["A1"].value.startswith("Resumen del informe Open LMS")
+    assert resumen["A6"].value == "Eventos totales"
+    assert resumen["B6"].value == 6
+    assert len(resumen._charts) == 2
     assert len(libro["Estudiantes DG"]._charts) == 1
     assert len(libro["Estudiantes DG2"]._charts) == 1
     libro.close()

@@ -4,7 +4,8 @@ import re
 import gc
 import shutil
 import tempfile
-from collections import defaultdict
+from collections import Counter, defaultdict
+from statistics import median
 from pathlib import Path
 
 import pandas as pd
@@ -29,6 +30,7 @@ SHEET_NAMES = (
     "Estudiantes DG",
     "Estudiantes DG2",
     "Tabla Dinamica Actividades",
+    "Resumen Informe",
     "Diseño de Cursos",
 )
 
@@ -818,7 +820,7 @@ class ExcelProcess:
 
     def crear_grafica_estudiantes(
         self, programa, periodo, progress_callback=None, resumen_actividades=None,
-        diseno_cursos=None,
+        diseno_cursos=None, resumen_informe=None,
     ):
         """Crea Estudiantes DG conservando fórmulas y hojas mediante copia incremental."""
         if not self.exists:
@@ -875,6 +877,8 @@ class ExcelProcess:
         hojas_excluidas = {"Estudiantes DG", "Estudiantes DG2"}
         if resumen_actividades is not None:
             hojas_excluidas.add("Tabla Dinamica Actividades")
+        if resumen_informe is not None:
+            hojas_excluidas.add("Resumen Informe")
         if diseno_cursos is not None:
             hojas_excluidas.add("Diseño de Cursos")
         nombres = [n for n in libro_formulas.sheetnames if n not in hojas_excluidas]
@@ -952,6 +956,10 @@ class ExcelProcess:
             )
             if resumen_actividades is not None:
                 self._escribir_tabla_actividades(libro_salida, resumen_actividades)
+            if resumen_informe is not None:
+                self._escribir_resumen_informe(
+                    libro_salida, resumen_informe, programa, periodo
+                )
             if diseno_cursos is not None:
                 self._escribir_diseno_cursos(libro_salida, *diseno_cursos)
             if progress_callback:
@@ -970,6 +978,8 @@ class ExcelProcess:
         self._row_counts["Estudiantes DG2"] = 0
         if resumen_actividades is not None:
             self._row_counts["Tabla Dinamica Actividades"] = len(resumen_actividades)
+        if resumen_informe is not None:
+            self._row_counts["Resumen Informe"] = 0
         if diseno_cursos is not None:
             self._row_counts["Diseño de Cursos"] = 1
         if progress_callback:
@@ -1083,6 +1093,10 @@ class ExcelProcess:
                 valor = hoja.cell(fila, columna).value
                 if isinstance(valor, (int, float)) and valor:
                     resumen[curso][accion.casefold()] = int(valor)
+        resumen_informe = self._calcular_resumen_informe(
+            libro["Original"],
+            (lambda valor: progress_callback(valor)) if progress_callback else None,
+        )
         libro.close()
         if not resumen:
             raise ValueError("La tabla de actividades no contiene cursos para evaluar.")
@@ -1098,9 +1112,235 @@ class ExcelProcess:
         sin_contenido = len(cursos_evaluados) - con_contenido
         indicadores = (len(unificados), sin_contenido, con_contenido)
         self.crear_grafica_estudiantes(
-            programa, periodo, progress_callback, resumen, indicadores
+            programa, periodo, progress_callback, resumen, indicadores,
+            resumen_informe,
         )
         return indicadores
+
+    @staticmethod
+    def _calcular_resumen_informe(hoja_original, progress_callback=None):
+        """Consolida los indicadores que alimentaran Resumen Informe."""
+        filas = hoja_original.iter_rows(values_only=True)
+        encabezados = next(filas, None)
+        columnas = {
+            str(valor or "").strip().casefold(): indice
+            for indice, valor in enumerate(encabezados or ())
+        }
+        requeridas = ("rol", "curso", "mes", "dia", "idusuario")
+        faltantes = [nombre for nombre in requeridas if nombre not in columnas]
+        if faltantes:
+            raise ValueError(
+                "Original no contiene las columnas para Resumen Informe: "
+                + ", ".join(faltantes)
+            )
+
+        eventos_mes = defaultdict(Counter)
+        usuarios_mes = defaultdict(set)
+        usuarios_rol = defaultdict(set)
+        dias_usuario = defaultdict(set)
+        eventos_curso = Counter()
+        usuarios_curso = defaultdict(set)
+        dias_curso = defaultdict(set)
+        dias_docente_curso = defaultdict(set)
+        total_eventos = 0
+
+        total_filas = max((hoja_original.max_row or 1) - 1, 1)
+        for numero_fila, fila in enumerate(filas, 1):
+            total_eventos += 1
+            rol = str(fila[columnas["rol"]] or "").strip().casefold()
+            curso = str(fila[columnas["curso"]] or "").strip()
+            usuario = fila[columnas["idusuario"]]
+            if usuario in (None, ""):
+                continue
+            usuario = str(usuario).strip()
+            nombre_docente = (
+                str(fila[columnas["usuario"]] or "").strip()
+                if "usuario" in columnas else usuario
+            )
+            try:
+                mes = int(float(fila[columnas["mes"]]))
+                dia = int(float(fila[columnas["dia"]]))
+            except (TypeError, ValueError):
+                continue
+            if not 1 <= mes <= 12 or not 1 <= dia <= 31:
+                continue
+            fecha = (mes, dia)
+            usuarios_rol[rol].add(usuario)
+            dias_usuario[(rol, usuario)].add(fecha)
+            eventos_mes[mes][rol] += 1
+            if rol == "student":
+                usuarios_mes[mes].add(usuario)
+                if curso:
+                    eventos_curso[curso] += 1
+                    usuarios_curso[curso].add(usuario)
+                    dias_curso[curso].add(fecha)
+            elif rol == "editingteacher" and curso:
+                dias_docente_curso[(curso, nombre_docente or usuario)].add(fecha)
+            if progress_callback and numero_fila % 5_000 == 0:
+                progress_callback(min(1 + int(numero_fila * 3 / total_filas), 4))
+
+        def estadistica_dias(rol):
+            valores = [
+                len(dias) for (rol_fila, _), dias in dias_usuario.items()
+                if rol_fila == rol
+            ]
+            if not valores:
+                return 0.0, 0.0
+            return round(sum(valores) / len(valores), 1), float(median(valores))
+
+        promedio_estudiantes, mediana_estudiantes = estadistica_dias("student")
+        promedio_docentes, mediana_docentes = estadistica_dias("editingteacher")
+        meses = sorted(eventos_mes)
+        cursos = [
+            {
+                "curso": curso,
+                "eventos": cantidad,
+                "estudiantes": len(usuarios_curso[curso]),
+                "dias": len(dias_curso[curso]),
+            }
+            for curso, cantidad in eventos_curso.most_common(6)
+        ]
+        docentes = [
+            {"curso": curso, "docente": docente, "dias": len(dias)}
+            for (curso, docente), dias in sorted(
+                dias_docente_curso.items(),
+                key=lambda elemento: (-len(elemento[1]), elemento[0][0].casefold()),
+            )[:6]
+        ]
+        return {
+            "total_eventos": total_eventos,
+            "usuarios_unicos": len(set().union(*usuarios_rol.values())),
+            "estudiantes": len(usuarios_rol["student"]),
+            "docentes": len(usuarios_rol["editingteacher"]),
+            "eventos_estudiantes": sum(eventos_mes[m]["student"] for m in meses),
+            "eventos_docentes": sum(eventos_mes[m]["editingteacher"] for m in meses),
+            "promedio_dias_estudiantes": promedio_estudiantes,
+            "mediana_dias_estudiantes": mediana_estudiantes,
+            "promedio_dias_docentes": promedio_docentes,
+            "mediana_dias_docentes": mediana_docentes,
+            "meses": [
+                {
+                    "mes": MESES_ABREVIADOS[mes],
+                    "eventos_estudiantes": eventos_mes[mes]["student"],
+                    "estudiantes_activos": len(usuarios_mes[mes]),
+                    "eventos_docentes": eventos_mes[mes]["editingteacher"],
+                }
+                for mes in meses
+            ],
+            "cursos": cursos,
+            "docentes_destacados": docentes,
+        }
+
+    @staticmethod
+    def _escribir_resumen_informe(libro, datos, programa, periodo):
+        """Crea la hoja ejecutiva que sirve de fuente para el informe Word."""
+        hoja = libro.add_worksheet("Resumen Informe")
+        hoja.set_tab_color("#D6A419")
+        hoja.hide_gridlines(2)
+        hoja.set_landscape()
+        hoja.fit_to_pages(1, 2)
+        hoja.freeze_panes(4, 0)
+
+        titulo = libro.add_format({
+            "bold": True, "font_color": "#FFFFFF", "bg_color": "#082B55",
+            "align": "center", "valign": "vcenter", "font_size": 18,
+        })
+        seccion = libro.add_format({
+            "bold": True, "font_color": "#FFFFFF", "bg_color": "#1767A6",
+            "align": "left", "valign": "vcenter", "font_size": 12,
+        })
+        encabezado = libro.add_format({
+            "bold": True, "font_color": "#FFFFFF", "bg_color": "#0A3A6B",
+            "align": "center", "valign": "vcenter", "border": 1,
+        })
+        texto = libro.add_format({
+            "font_color": "#23364D", "bg_color": "#FFFFFF", "border": 1,
+            "border_color": "#C7D4E3", "valign": "vcenter",
+        })
+        numero = libro.add_format({
+            "font_color": "#23364D", "bg_color": "#F4F7FB", "border": 1,
+            "border_color": "#C7D4E3", "align": "center", "num_format": "#,##0",
+        })
+        decimal = libro.add_format({
+            "font_color": "#23364D", "bg_color": "#F4F7FB", "border": 1,
+            "border_color": "#C7D4E3", "align": "center", "num_format": "0.0",
+        })
+
+        hoja.merge_range("A1:J2", f"Resumen del informe Open LMS - {programa} {periodo}", titulo)
+        hoja.merge_range("A4:C4", "Indicadores principales", seccion)
+        hoja.write_row("A5", ["Indicador", "Resultado", "Lectura"], encabezado)
+        filas_indicadores = [
+            ("Eventos totales", datos["total_eventos"], "Interacciones registradas"),
+            ("Usuarios \u00fanicos", datos["usuarios_unicos"], f'{datos["estudiantes"]} estudiantes y {datos["docentes"]} docentes'),
+            ("Actividad estudiantil", datos["eventos_estudiantes"], "Eventos de estudiantes"),
+            ("Actividad docente", datos["eventos_docentes"], "Eventos de docentes"),
+            ("D\u00edas activos por estudiante", datos["promedio_dias_estudiantes"], f'Mediana: {datos["mediana_dias_estudiantes"]:g} d\u00edas'),
+            ("D\u00edas activos por docente", datos["promedio_dias_docentes"], f'Mediana: {datos["mediana_dias_docentes"]:g} d\u00edas'),
+        ]
+        for fila, (indicador, valor, lectura) in enumerate(filas_indicadores, 5):
+            hoja.write(fila, 0, indicador, texto)
+            hoja.write_number(fila, 1, valor, decimal if isinstance(valor, float) and not valor.is_integer() else numero)
+            hoja.write(fila, 2, lectura, texto)
+
+        fila_meses = 13
+        hoja.merge_range(fila_meses, 0, fila_meses, 3, "Actividad mensual", seccion)
+        hoja.write_row(fila_meses + 1, 0, ["Mes", "Eventos estudiantes", "Estudiantes activos", "Eventos docentes"], encabezado)
+        for indice, mes in enumerate(datos["meses"], fila_meses + 2):
+            hoja.write(indice, 0, mes["mes"], texto)
+            hoja.write_row(indice, 1, [mes["eventos_estudiantes"], mes["estudiantes_activos"], mes["eventos_docentes"]], numero)
+
+        grafica_mensual = libro.add_chart({"type": "line"})
+        ultima_fila_mes = fila_meses + 1 + len(datos["meses"])
+        for columna, nombre, color in ((1, "Estudiantes", "#1767A6"), (3, "Docentes", "#D6A419")):
+            grafica_mensual.add_series({
+                "name": nombre,
+                "categories": ["Resumen Informe", fila_meses + 2, 0, ultima_fila_mes, 0],
+                "values": ["Resumen Informe", fila_meses + 2, columna, ultima_fila_mes, columna],
+                "line": {"color": color, "width": 2.5},
+                "marker": {"type": "circle", "size": 7, "fill": {"color": color}},
+            })
+        grafica_mensual.set_title({"name": "Eventos mensuales por tipo de usuario"})
+        grafica_mensual.set_y_axis({"name": "Eventos registrados", "major_gridlines": {"visible": True}})
+        grafica_mensual.set_legend({"position": "top"})
+        grafica_mensual.set_size({"width": 700, "height": 330})
+        hoja.insert_chart("F4", grafica_mensual)
+
+        fila_cursos = 23
+        hoja.merge_range(fila_cursos, 0, fila_cursos, 3, "Cursos destacados", seccion)
+        hoja.write_row(fila_cursos + 1, 0, ["Curso", "Eventos", "Estudiantes \u00fanicos", "D\u00edas activos"], encabezado)
+        for indice, curso in enumerate(datos["cursos"], fila_cursos + 2):
+            hoja.write(indice, 0, curso["curso"], texto)
+            hoja.write_row(indice, 1, [curso["eventos"], curso["estudiantes"], curso["dias"]], numero)
+
+        grafica_cursos = libro.add_chart({"type": "bar"})
+        ultima_fila_curso = fila_cursos + 1 + len(datos["cursos"])
+        grafica_cursos.add_series({
+            "name": "Eventos estudiantiles",
+            "categories": ["Resumen Informe", fila_cursos + 2, 0, ultima_fila_curso, 0],
+            "values": ["Resumen Informe", fila_cursos + 2, 1, ultima_fila_curso, 1],
+            "fill": {"color": "#5B9BD5"}, "border": {"none": True},
+            "data_labels": {"value": True, "num_format": "#,##0"},
+        })
+        grafica_cursos.set_title({"name": "Cursos con mayor actividad estudiantil"})
+        grafica_cursos.set_x_axis({"name": "Eventos estudiantiles"})
+        grafica_cursos.set_legend({"none": True})
+        grafica_cursos.set_size({"width": 700, "height": 360})
+        hoja.insert_chart("F22", grafica_cursos)
+
+        fila_docentes = 34
+        hoja.merge_range(fila_docentes, 0, fila_docentes, 2, "Continuidad docente", seccion)
+        hoja.write_row(fila_docentes + 1, 0, ["Curso", "Docente", "D\u00edas activos"], encabezado)
+        for indice, docente in enumerate(datos["docentes_destacados"], fila_docentes + 2):
+            hoja.write(indice, 0, docente["curso"], texto)
+            hoja.write(indice, 1, docente["docente"], texto)
+            hoja.write_number(indice, 2, docente["dias"], numero)
+
+        hoja.set_column("A:A", 46)
+        hoja.set_column("B:B", 24)
+        hoja.set_column("C:D", 19)
+        hoja.set_column("E:E", 3)
+        hoja.set_column("F:J", 14)
+        hoja.set_row(0, 28)
 
     @staticmethod
     def _escribir_diseno_cursos(libro, unificados, sin_contenido, con_contenido):

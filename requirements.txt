@@ -4,4 +4,5 @@ numpy
 openpyxl
 xlsxwriter
 matplotlib
+python-docx
 pytest

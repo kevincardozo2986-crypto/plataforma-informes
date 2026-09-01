@@ -445,11 +445,10 @@ QComboBox QScrollBar::handle:vertical {
 QComboBox QScrollBar::add-line:vertical,
 QComboBox QScrollBar::sub-line:vertical { height: 0px; }
 QLabel#selectedCsvLabel {
-    background-color: #FFFFFF; color: #68778B; border: 1px solid #CBD5E1;
-    border-radius: 3px; padding: 8px 10px; font-size: 10px;
+    background-color: #F5F7FB; color: #687086; border-radius: 6px; padding: 10px 12px; font-size: 11px; border-left: 3px solid #36BCE8;
 }
-QLabel#destinationTitle { color: #164E87; font-size: 9px; font-weight: 900; padding-top: 3px; }
-QLabel#destinationPath { color: #355B80; border-top: 1px solid #D6E0EA; padding-top: 6px; font-size: 10px; }
+QLabel#destinationTitle { color: #123D68; font-size: 13px; font-weight: 700; padding-top: 3px; }
+QLabel#destinationPath { color: #3B5998; background-color: #F0F7FF; border-radius: 6px; padding: 10px 12px; font-size: 11px; border-left: 3px solid #0A4D91; }
 QFrame#excelStepsContainer {
     background-color: #FFFFFF; border: 1px solid #D7E0E9;
     border-top: none; border-bottom-left-radius: 10px;
@@ -477,9 +476,12 @@ QPushButton#stepActionButton, QPushButton#primaryExcelButton, QPushButton#second
     border-radius: 7px; padding: 9px 15px; font-size: 11px; font-weight: 800;
 }
 QPushButton#primaryExcelButton {
-    background-color: #0A4D91; color: #FFFFFF; border: none;
+    background-color: #FF5E70; color: #FFFFFF; border: none; border-radius: 6px;
+    padding: 10px 18px; font-size: 12px; font-weight: 700;
 }
-QPushButton#primaryExcelButton:hover { background-color: #073A6F; }
+QPushButton#primaryExcelButton:hover { background-color: #EB4B5E; }
+QPushButton#primaryExcelButton:pressed { background-color: #D93F52; }
+QPushButton#primaryExcelButton:disabled { background-color: #D9DDE7; color: #99A0AC; }
 QPushButton#loadedCsvButton {
     background-color: #E7F6ED; color: #137A45; border: 1px solid #9FD5B7;
     border-radius: 4px; padding: 9px 15px; font-size: 11px; font-weight: 800;
@@ -490,9 +492,10 @@ QPushButton#stepActionButton {
 }
 QPushButton#stepActionButton:hover { background-color: #EAF3FC; }
 QPushButton#secondaryExcelButton {
-    background-color: #FFFFFF; color: #124C87; border: 1px solid #CDD8E4;
+    background-color: #FFFFFF; color: #211568; border: 1px solid #D9DDE7; border-radius: 6px;
+    padding: 8px 14px; font-size: 12px; font-weight: 600;
 }
-QPushButton#secondaryExcelButton:hover { background-color: #EDF4FB; }
+QPushButton#secondaryExcelButton:hover { background-color: #F3F5FA; border-color: #BFC5D2; }
 QPushButton#addOptionButton {
     background-color: #FFFFFF; color: #0A4D91; border: 1px solid #0A4D91;
     border-radius: 3px; padding: 0; font-size: 17px; font-weight: 600;
@@ -513,12 +516,16 @@ QListWidget#optionList {
 QListWidget#optionList::item { padding: 9px 10px; border-bottom: 1px solid #EDF1F5; }
 QListWidget#optionList::item:selected { background-color: #E7F1FA; color: #0A4D91; }
 QPushButton:disabled { background-color: #E9EDF2; color: #9AA4B2; border-color: #E0E5EB; }
-QLabel#excelFeedback { color: #617187; font-size: 10px; }
-QProgressBar#excelProgressBar {
-    background-color: #DDE6F0; border: none; border-radius: 4px;
+QLabel#excelFeedback { color: #687086; font-size: 12px; background-color: #F5F7FB; padding: 10px 12px; border-radius: 6px; border-left: 3px solid #36BCE8; }
+QProgressBar {
+    background-color: #E8EDF3;
+    border-radius: 6px;
+    height: 8px;
+    border: none;
 }
-QProgressBar#excelProgressBar::chunk {
-    background-color: #1972C8; border-radius: 4px;
+QProgressBar::chunk {
+    background-color: #36BCE8;
+    border-radius: 6px;
 }
 QTabWidget#previewTabs::pane { background-color: #FFFFFF; border: 1px solid #DCE3EB; border-radius: 7px; }
 QTabBar::tab { background: #EAF0F6; color: #50637A; padding: 9px 14px; margin-right: 2px; }

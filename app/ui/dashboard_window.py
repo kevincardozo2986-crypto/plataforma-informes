@@ -23,6 +23,7 @@ from app.ui.theme import DASHBOARD_STYLESHEET
 from app.ui.modal_dialogs import MODAL_STYLE, exec_modal
 from app.ui.window_chrome import preparar_ventana_sin_marco
 from app.ui.excel_process_window import ExcelProcessWindow
+from app.ui.word_report_window import WordReportWindow
 from app.ui.users_window import UsersPage
 from app.services.process_history_service import (
     list_completed_processes,
@@ -185,6 +186,9 @@ class DashboardWindow(QMainWindow):
         self.excel_page = ExcelProcessWindow(user)
         self.excel_page.back_requested.connect(self._show_dashboard)
         self.stack.addWidget(self.excel_page)
+        self.word_page = WordReportWindow(user)
+        self.word_page.back_requested.connect(self._show_dashboard)
+        self.stack.addWidget(self.word_page)
         self.excel_requested.connect(self._open_excel)
         if user["role"] == "admin":
             self.users_page = UsersPage(user)
@@ -385,8 +389,8 @@ class DashboardWindow(QMainWindow):
 
     def _open_report_creation(self):
         """Mantiene la acción de creación separada del archivo de terminados."""
-        self.excel_page.preparar_nuevo_informe()
-        self.stack.setCurrentWidget(self.excel_page)
+        self.word_page.reset()
+        self.stack.setCurrentWidget(self.word_page)
 
     def _open_history(self):
         procesos = list_incomplete_processes(self.user)

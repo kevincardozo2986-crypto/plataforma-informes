@@ -539,7 +539,7 @@ class ExcelProcessWindow(QWidget):
             ),
             (
                 "Crear diseño de cursos",
-                "Resume cursos unificados y cursos con o sin contenido.",
+                "Resume cursos y crea Resumen Informe con indicadores y gr\u00e1ficas.",
                 True,
                 True,
             ),
@@ -806,11 +806,15 @@ class ExcelProcessWindow(QWidget):
         self._guardar_avance(self.completed_step, status="error", error_message=message)
         show_error(self, title, message)
 
-    def _start_background(self, operation, on_success, on_error):
+    def _start_background(
+        self, operation, on_success, on_error, status_message=None
+    ):
         if self._thread and self._thread.isRunning():
             return
         self._bloquear_controles()
         self.feedback.setText("Procesando el archivo por bloques. La aplicación seguirá respondiendo…")
+        if status_message:
+            self.feedback.setText(status_message)
         self.progress_bar.setValue(1)
         self.progress_bar.show()
         self._thread = QThread(self)
@@ -1078,6 +1082,8 @@ class ExcelProcessWindow(QWidget):
             lambda mensaje: self._task_failed(
                 7, "Error al crear Diseño de Cursos", mensaje
             ),
+            "Analizando todos los registros y construyendo Diseno de Cursos y "
+            "Resumen Informe. Este ultimo paso puede tardar varios minutos...",
         )
 
     def _diseno_cursos_creado(self, indicadores):
@@ -1088,7 +1094,7 @@ class ExcelProcessWindow(QWidget):
         self.feedback.setText(
             "Diseño de Cursos creado: "
             f"{unificados} unificados, {sin_contenido} sin contenido y "
-            f"{con_contenido} con contenido."
+            f"{con_contenido} con contenido. Resumen Informe tambi\u00e9n fue generado."
         )
         self.completed_step = 8
         self._guardar_avance(8)
