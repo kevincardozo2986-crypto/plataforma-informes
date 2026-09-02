@@ -259,7 +259,7 @@ class ExcelProcess:
             return
         clave = (curso, docente)
         dias_por_mes[clave][mes].add(dia)
-        dias_periodo[clave].add(dia)
+        dias_periodo[clave].add((mes, dia))
 
     @staticmethod
     def _excel_value(value):
@@ -368,7 +368,7 @@ class ExcelProcess:
 
                 clave = (curso, docente)
                 dias_por_mes[clave][mes].add(dia)
-                dias_periodo[clave].add(dia)
+                dias_periodo[clave].add((mes, dia))
                 if progress_callback and numero_fila % 5_000 == 0:
                     progress_callback(
                         min(5 + int(numero_fila * 50 / total_filas_original), 55)

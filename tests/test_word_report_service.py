@@ -40,7 +40,7 @@ def test_generates_word_from_finished_excel_and_preserves_template(tmp_path):
 
     destination = tmp_path / "Informe_2026-1_ING_SIS.docx"
     result = generate_word_report(
-        process.path, destination, "Ingenieria de Sistemas", "2026-1"
+        process.path, destination, "Administracion de Empresas", "2027-2"
     )
 
     assert result == destination
@@ -50,4 +50,21 @@ def test_generates_word_from_finished_excel_and_preserves_template(tmp_path):
     assert len(document.inline_shapes) == 6
     assert document.tables[0].cell(1, 1).text == "6"
     assert document.tables[2].cell(1, 0).text == "Febrero"
-    assert any("Ingenieria de Sistemas" in paragraph.text for paragraph in document.paragraphs)
+    report_text = "\n".join(paragraph.text for paragraph in document.paragraphs)
+    xml_text = " ".join(document.element.itertext())
+    normalized_text = report_text.casefold()
+    assert "Administracion de Empresas" in report_text
+    assert "2027-2" in report_text
+    assert "andrea cruz yomayusa" not in normalized_text
+    assert "optimizacion_6a_6b" not in normalized_text
+    assert "400.568" not in report_text
+    assert "59 cursos" not in report_text
+    assert "Días al mes de uso del Campus Virtual por parte de los docentes" in report_text
+    assert "Cursos con mayor actividad estudiantil" in report_text
+    assert "Administracion de Empresas" in xml_text
+    assert "2027-2" in xml_text
+    assert "10 hojas" not in report_text
+    assert "Hoja «Docentes»" not in report_text
+    assert "Hoja «Estudiantes»" not in report_text
+    assert "9 hojas" in report_text
+    assert "{{" not in xml_text
