@@ -105,6 +105,16 @@ Instala las dependencias:
 pip install -r requirements.txt
 ```
 
+La plantilla institucional usada para crear los documentos Word forma parte del
+proyecto y debe conservarse en esta ruta al copiarlo o clonarlo:
+
+```text
+templates/PLANTILLA_INFORME.docx
+```
+
+No es necesario seleccionarla manualmente: la aplicación la localiza desde esa
+carpeta, independientemente del directorio desde el cual se ejecute.
+
 ## Ejecución
 
 ```bash

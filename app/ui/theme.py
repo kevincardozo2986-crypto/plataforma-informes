@@ -482,6 +482,13 @@ QPushButton#primaryExcelButton {
 QPushButton#primaryExcelButton:hover { background-color: #EB4B5E; }
 QPushButton#primaryExcelButton:pressed { background-color: #D93F52; }
 QPushButton#primaryExcelButton:disabled { background-color: #D9DDE7; color: #99A0AC; }
+QPushButton#blueExcelButton {
+    background-color: #0B67D1; color: #FFFFFF; border: none; border-radius: 6px;
+    padding: 10px 18px; font-size: 12px; font-weight: 800;
+}
+QPushButton#blueExcelButton:hover { background-color: #0959B7; }
+QPushButton#blueExcelButton:pressed { background-color: #074A99; }
+QPushButton#blueExcelButton:disabled { background-color: #D9DDE7; color: #99A0AC; }
 QPushButton#loadedCsvButton {
     background-color: #E7F6ED; color: #137A45; border: 1px solid #9FD5B7;
     border-radius: 4px; padding: 9px 15px; font-size: 11px; font-weight: 800;

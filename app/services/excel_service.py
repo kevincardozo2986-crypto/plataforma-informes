@@ -65,6 +65,9 @@ class ExcelProcess:
             self.path = Path(self._temporary_directory.name) / "informe_en_proceso.xlsx"
         self._row_counts = {}
         self._teacher_summary_cache = None
+        self._student_summary_cache = None
+        self._activity_summary_cache = None
+        self._report_summary_cache = None
 
     @property
     def exists(self):
@@ -92,6 +95,11 @@ class ExcelProcess:
         indices_docentes = None
         dias_por_mes_cache = defaultdict(lambda: defaultdict(set))
         dias_periodo_cache = defaultdict(set)
+        dias_estudiantes_cache = defaultdict(lambda: defaultdict(set))
+        estudiantes_cache = defaultdict(lambda: defaultdict(set))
+        actividades_cache = defaultdict(lambda: defaultdict(int))
+        resumen_cache = self._new_report_accumulator()
+        indices_resumen = None
         try:
             for bloque_datos in chunks:
                 if cantidad_columnas == 0:
@@ -110,6 +118,9 @@ class ExcelProcess:
                             nombre: columnas_normalizadas[nombre]
                             for nombre in requeridas_docentes
                         }
+                    requeridas_resumen = ("rol", "curso", "mes", "dia", "idusuario")
+                    if all(nombre in columnas_normalizadas for nombre in requeridas_resumen):
+                        indices_resumen = columnas_normalizadas
                     hoja_original.write_row(0, 0, encabezados, formato_encabezado)
                     for indice, encabezado in enumerate(encabezados):
                         hoja_original.set_column(indice, indice, min(max(len(encabezado) + 2, 11), 30))
@@ -126,6 +137,12 @@ class ExcelProcess:
                             dias_por_mes_cache,
                             dias_periodo_cache,
                         )
+                    if indices_resumen:
+                        self._acumular_resumen_general(
+                            valores_fila, indices_resumen,
+                            dias_estudiantes_cache, estudiantes_cache,
+                            actividades_cache, resumen_cache,
+                        )
                     cantidad_filas += 1
                 if progress_callback and total_rows:
                     progress_callback(min(int(cantidad_filas * 96 / total_rows) + 2, 98))
@@ -141,9 +158,87 @@ class ExcelProcess:
             if dias_por_mes_cache
             else None
         )
+        self._student_summary_cache = (
+            (dias_estudiantes_cache, estudiantes_cache)
+            if dias_estudiantes_cache else None
+        )
+        self._activity_summary_cache = actividades_cache if actividades_cache else None
+        self._report_summary_cache = (
+            self._finalize_report_accumulator(resumen_cache)
+            if indices_resumen else None
+        )
         if progress_callback:
             progress_callback(100)
         return cantidad_filas, cantidad_columnas
+
+    @staticmethod
+    def _new_report_accumulator():
+        return {
+            "eventos_mes": defaultdict(Counter), "usuarios_mes": defaultdict(set),
+            "usuarios_rol": defaultdict(set), "dias_usuario": defaultdict(set),
+            "eventos_curso": Counter(), "usuarios_curso": defaultdict(set),
+            "dias_curso": defaultdict(set), "dias_docente_curso": defaultdict(set),
+            "total_eventos": 0,
+        }
+
+    @staticmethod
+    def _acumular_resumen_general(
+        fila, columnas, dias_estudiantes, estudiantes, actividades, resumen
+    ):
+        resumen["total_eventos"] += 1
+        rol = str(fila[columnas["rol"]] or "").strip().casefold()
+        curso = str(fila[columnas["curso"]] or "").strip()
+        usuario = fila[columnas["idusuario"]]
+        accion = str(fila[columnas["accion"]] or "").strip().casefold() if "accion" in columnas else ""
+        if curso and accion:
+            actividades[curso][accion] += 1
+        if usuario in (None, ""):
+            return
+        usuario = str(usuario).strip()
+        try:
+            mes = int(float(fila[columnas["mes"]]))
+            dia = int(float(fila[columnas["dia"]]))
+        except (TypeError, ValueError):
+            return
+        if not 1 <= mes <= 12 or not 1 <= dia <= 31:
+            return
+        fecha = (mes, dia)
+        resumen["usuarios_rol"][rol].add(usuario)
+        resumen["dias_usuario"][(rol, usuario)].add(fecha)
+        resumen["eventos_mes"][mes][rol] += 1
+        if rol == "student":
+            resumen["usuarios_mes"][mes].add(usuario)
+            if curso:
+                dias_estudiantes[curso][mes].add(dia)
+                estudiantes[curso][mes].add(usuario)
+                resumen["eventos_curso"][curso] += 1
+                resumen["usuarios_curso"][curso].add(usuario)
+                resumen["dias_curso"][curso].add(fecha)
+        elif rol == "editingteacher" and curso:
+            nombre = str(fila[columnas["usuario"]] or "").strip() if "usuario" in columnas else usuario
+            resumen["dias_docente_curso"][(curso, nombre or usuario)].add(fecha)
+
+    @staticmethod
+    def _finalize_report_accumulator(datos):
+        def estadistica(rol):
+            valores = [len(dias) for (tipo, _), dias in datos["dias_usuario"].items() if tipo == rol]
+            return (round(sum(valores) / len(valores), 1), float(median(valores))) if valores else (0.0, 0.0)
+        promedio_e, mediana_e = estadistica("student")
+        promedio_d, mediana_d = estadistica("editingteacher")
+        meses = sorted(datos["eventos_mes"])
+        usuarios = datos["usuarios_rol"]
+        return {
+            "total_eventos": datos["total_eventos"],
+            "usuarios_unicos": len(set().union(*usuarios.values())) if usuarios else 0,
+            "estudiantes": len(usuarios["student"]), "docentes": len(usuarios["editingteacher"]),
+            "eventos_estudiantes": sum(datos["eventos_mes"][m]["student"] for m in meses),
+            "eventos_docentes": sum(datos["eventos_mes"][m]["editingteacher"] for m in meses),
+            "promedio_dias_estudiantes": promedio_e, "mediana_dias_estudiantes": mediana_e,
+            "promedio_dias_docentes": promedio_d, "mediana_dias_docentes": mediana_d,
+            "meses": [{"mes": MESES_ABREVIADOS[m], "eventos_estudiantes": datos["eventos_mes"][m]["student"], "estudiantes_activos": len(datos["usuarios_mes"][m]), "eventos_docentes": datos["eventos_mes"][m]["editingteacher"]} for m in meses],
+            "cursos": [{"curso": c, "eventos": n, "estudiantes": len(datos["usuarios_curso"][c]), "dias": len(datos["dias_curso"][c])} for c, n in datos["eventos_curso"].most_common(6)],
+            "docentes_destacados": [{"curso": c, "docente": d, "dias": len(ds)} for (c, d), ds in sorted(datos["dias_docente_curso"].items(), key=lambda e: (-len(e[1]), e[0][0].casefold()))[:6]],
+        }
 
     @staticmethod
     def _acumular_actividad_docente(
@@ -597,25 +692,30 @@ class ExcelProcess:
                 + ", ".join(faltantes)
             )
 
-        dias = defaultdict(lambda: defaultdict(set))
-        estudiantes = defaultdict(lambda: defaultdict(set))
         total_original = max((original.max_row or 1) - 1, 1)
-        for numero, fila in enumerate(filas, 1):
-            if str(fila[columnas["rol"]] or "").strip().casefold() != "student":
-                continue
-            curso = str(fila[columnas["curso"]] or "").strip()
-            usuario = fila[columnas["idusuario"]]
-            try:
-                mes = int(float(fila[columnas["mes"]]))
-                dia = int(float(fila[columnas["dia"]]))
-            except (TypeError, ValueError):
-                continue
-            if not curso or usuario in (None, "") or not 1 <= mes <= 12 or not 1 <= dia <= 31:
-                continue
-            dias[curso][mes].add(dia)
-            estudiantes[curso][mes].add(str(usuario).strip())
-            if progress_callback and numero % 5_000 == 0:
-                progress_callback(min(5 + int(numero * 42 / total_original), 47))
+        if self._student_summary_cache:
+            dias, estudiantes = self._student_summary_cache
+            if progress_callback:
+                progress_callback(47)
+        else:
+            dias = defaultdict(lambda: defaultdict(set))
+            estudiantes = defaultdict(lambda: defaultdict(set))
+            for numero, fila in enumerate(filas, 1):
+                if str(fila[columnas["rol"]] or "").strip().casefold() != "student":
+                    continue
+                curso = str(fila[columnas["curso"]] or "").strip()
+                usuario = fila[columnas["idusuario"]]
+                try:
+                    mes = int(float(fila[columnas["mes"]]))
+                    dia = int(float(fila[columnas["dia"]]))
+                except (TypeError, ValueError):
+                    continue
+                if not curso or usuario in (None, "") or not 1 <= mes <= 12 or not 1 <= dia <= 31:
+                    continue
+                dias[curso][mes].add(dia)
+                estudiantes[curso][mes].add(str(usuario).strip())
+                if progress_callback and numero % 5_000 == 0:
+                    progress_callback(min(5 + int(numero * 42 / total_original), 47))
         if not dias:
             libro_lectura.close()
             raise ValueError("No se encontraron registros con rol 'student' en Original.")
@@ -812,6 +912,9 @@ class ExcelProcess:
         finally:
             libro_lectura.close()
             libro_salida.close()
+        filas = None
+        original = None
+        gc.collect()
         ruta_nueva.replace(self.path)
         self._row_counts["Tabla Dinamica Estudiantes"] = fila_indicadores
         if progress_callback:
@@ -987,6 +1090,20 @@ class ExcelProcess:
         return [str(valor) for valor in encabezados[columna_inicio:columna_total_dias]]
 
     def crear_tabla_actividades(self, programa, periodo, progress_callback=None):
+        if self._activity_summary_cache:
+            resumen = self._activity_summary_cache
+            if progress_callback:
+                progress_callback(45)
+            self.crear_grafica_estudiantes(
+                programa, periodo,
+                (lambda valor: progress_callback(45 + int(valor * 0.54)))
+                if progress_callback else None,
+                resumen,
+            )
+            if progress_callback:
+                progress_callback(100)
+            acciones = sorted({accion for valores in resumen.values() for accion in valores})
+            return len(resumen), acciones
         """Cuenta registros por curso y acción para todos los roles de Original."""
         if not self.exists:
             raise FileNotFoundError("Todavía no existe un Excel de trabajo.")
@@ -1093,10 +1210,14 @@ class ExcelProcess:
                 valor = hoja.cell(fila, columna).value
                 if isinstance(valor, (int, float)) and valor:
                     resumen[curso][accion.casefold()] = int(valor)
-        resumen_informe = self._calcular_resumen_informe(
-            libro["Original"],
-            (lambda valor: progress_callback(valor)) if progress_callback else None,
-        )
+        resumen_informe = self._report_summary_cache
+        if resumen_informe is None:
+            resumen_informe = self._calcular_resumen_informe(
+                libro["Original"],
+                (lambda valor: progress_callback(valor)) if progress_callback else None,
+            )
+        elif progress_callback:
+            progress_callback(4)
         libro.close()
         if not resumen:
             raise ValueError("La tabla de actividades no contiene cursos para evaluar.")

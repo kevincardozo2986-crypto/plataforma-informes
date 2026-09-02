@@ -3,7 +3,13 @@ from docx import Document
 from openpyxl import load_workbook
 
 from app.services.excel_service import ExcelProcess
-from app.services.word_report_service import generate_word_report
+from app.services.word_report_service import _bundled_template_path, generate_word_report
+
+
+def test_institutional_word_template_is_part_of_project():
+    template = _bundled_template_path()
+    assert template.is_file()
+    assert template.name == "PLANTILLA_INFORME.docx"
 
 
 def test_generates_word_from_finished_excel_and_preserves_template(tmp_path):

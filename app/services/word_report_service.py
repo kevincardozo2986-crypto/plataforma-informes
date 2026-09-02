@@ -1,5 +1,6 @@
 """Generacion del informe Word institucional desde el Excel terminado."""
 
+import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -11,7 +12,22 @@ from docx import Document
 from openpyxl import load_workbook
 
 
-TEMPLATE_PATH = Path(__file__).resolve().parents[2] / "templates" / "PLANTILLA_INFORME.docx"
+TEMPLATE_FILENAME = "PLANTILLA_INFORME.docx"
+
+
+def _bundled_template_path():
+    """Localiza la plantilla tanto en el proyecto como en una app empaquetada."""
+    bundle_root = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[2]))
+    candidates = (
+        bundle_root / "templates" / TEMPLATE_FILENAME,
+        Path(sys.executable).resolve().parent / "templates" / TEMPLATE_FILENAME,
+        Path(__file__).resolve().parents[2] / "templates" / TEMPLATE_FILENAME,
+        Path(__file__).resolve().parents[2] / TEMPLATE_FILENAME,
+    )
+    return next((path for path in candidates if path.is_file()), candidates[0])
+
+
+TEMPLATE_PATH = _bundled_template_path()
 MONTH_NAMES = {
     "ENE": "Enero", "FEB": "Febrero", "MAR": "Marzo", "ABR": "Abril",
     "MAY": "Mayo", "JUN": "Junio", "JUL": "Julio", "AGO": "Agosto",
@@ -233,19 +249,23 @@ def _fill_table(table, headers, rows):
             
             # Dar estilo a la fila de encabezados
             if row_index == 0:
-                cell.paragraphs[0].font.bold = True
-                cell.paragraphs[0].font.size = Pt(11)
-                cell.paragraphs[0].font.color.rgb = RGBColor(255, 255, 255)  # Blanco
-                cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                paragraph = cell.paragraphs[0]
+                paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                for run in paragraph.runs:
+                    run.bold = True
+                    run.font.size = Pt(11)
+                    run.font.color.rgb = RGBColor(255, 255, 255)  # Blanco
                 # Color de fondo azul para encabezado
                 from docx.oxml import parse_xml
                 shading_elm = parse_xml(r'<w:shd {} w:fill="2878B5"/>'.format('xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'))
                 cell._element.get_or_add_tcPr().append(shading_elm)
             else:
                 # Dar estilo a las filas de datos
-                cell.paragraphs[0].font.size = Pt(10)
-                cell.paragraphs[0].font.color.rgb = RGBColor(33, 21, 104)  # Texto oscuro
-                cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.LEFT
+                paragraph = cell.paragraphs[0]
+                paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                for run in paragraph.runs:
+                    run.font.size = Pt(10)
+                    run.font.color.rgb = RGBColor(33, 21, 104)  # Texto oscuro
 
 
 def _replace_images(document, image_paths):
@@ -277,11 +297,14 @@ def generate_word_report(workbook_path, output_path, program, period, template_p
     """Genera el DOCX final conservando estructura, estilos y posiciones de la plantilla."""
     workbook_path = Path(workbook_path)
     output_path = Path(output_path)
-    template_path = Path(template_path or TEMPLATE_PATH)
+    template_path = Path(template_path) if template_path else _bundled_template_path()
     if not workbook_path.is_file():
         raise FileNotFoundError("El Excel terminado no existe.")
     if not template_path.is_file():
-        raise FileNotFoundError("No se encontro la plantilla institucional de Word.")
+        raise FileNotFoundError(
+            "No se encontro la plantilla institucional de Word. "
+            f"Debe existir en: {template_path}"
+        )
 
     data = _extract_data(workbook_path)
     indicators = {str(row[0]): row[1:] for row in data["indicators"]}

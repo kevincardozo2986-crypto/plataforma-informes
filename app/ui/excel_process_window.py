@@ -270,6 +270,7 @@ class ExcelProcessWindow(QWidget):
         self._thread = None
         self._worker = None
         self._control_states = {}
+        self._configuration_locked = False
         self.setStyleSheet(EXCEL_MODULE_STYLESHEET)
         self._build_ui()
 
@@ -289,6 +290,7 @@ class ExcelProcessWindow(QWidget):
         self.report_paths = None
         self.completed_step = 0
         self._report_saved = False
+        self._configuration_locked = False
         for paso in self.steps:
             paso.set_state("pending")
         self.file_label.setText("Ningún archivo seleccionado")
@@ -438,7 +440,7 @@ class ExcelProcessWindow(QWidget):
         select_base.setObjectName("secondaryExcelButton")
         select_base.clicked.connect(self._select_base_directory)
         self.load_button = QPushButton("↑  CARGAR CSV")
-        self.load_button.setObjectName("primaryExcelButton")
+        self.load_button.setObjectName("blueExcelButton")
         self.load_button.setFixedWidth(190)
         self.load_button.setEnabled(False)
         self.load_button.clicked.connect(self._load_csv)
@@ -578,7 +580,7 @@ class ExcelProcessWindow(QWidget):
         self.preview_button.setEnabled(False)
         self.preview_button.clicked.connect(self._preview)
         self.save_button = QPushButton("Guardar Excel")
-        self.save_button.setObjectName("primaryExcelButton")
+        self.save_button.setObjectName("blueExcelButton")
         self.save_button.setEnabled(False)
         self.save_button.clicked.connect(self._save)
         status_area = QVBoxLayout()
@@ -776,6 +778,11 @@ class ExcelProcessWindow(QWidget):
 
     def _csv_loaded(self, resultado_carga):
         cantidad_columnas, self.report_paths = resultado_carga
+        # Los pasos usan la copia estable que acaba de quedar en la carpeta institucional.
+        self.csv_path = self.report_paths.source_csv
+        self._configuration_locked = True
+        for selector in (self.period, self.level, self.modality, self.program):
+            selector.setEnabled(False)
         self._actualizar_estado_boton_carga(True)
         self.steps[0].set_state("available")
         self.steps[1].set_state("pending")
@@ -796,7 +803,7 @@ class ExcelProcessWindow(QWidget):
         """Diferencia visualmente un CSV pendiente de uno ya cargado."""
         self.load_button.setText("✓  CSV CARGADO" if cargado else "↑  CARGAR CSV")
         self.load_button.setObjectName(
-            "loadedCsvButton" if cargado else "primaryExcelButton"
+            "loadedCsvButton" if cargado else "blueExcelButton"
         )
         self.load_button.style().unpolish(self.load_button)
         self.load_button.style().polish(self.load_button)
@@ -869,6 +876,9 @@ class ExcelProcessWindow(QWidget):
         if hilo_finalizado:
             hilo_finalizado.deleteLater()
         self._restaurar_controles()
+        if self._configuration_locked:
+            for selector in (self.period, self.level, self.modality, self.program):
+                selector.setEnabled(False)
         self.load_button.setEnabled(bool(self.csv_path and self.base_directory))
         excel_disponible = self.excel_process.exists
         self.preview_button.setEnabled(excel_disponible)
@@ -891,12 +901,26 @@ class ExcelProcessWindow(QWidget):
         )
 
     def _write_original(self, prepare, progress):
+        self._recover_source_csv_if_needed()
         progress(2)
         total_filas = estimate_csv_rows(self.csv_path)
         return self.excel_process.create_original_from_chunks(
             iter_csv_chunks(self.csv_path, prepare=prepare),
             total_rows=total_filas,
             progress_callback=progress,
+        )
+
+    def _recover_source_csv_if_needed(self):
+        """Recupera el CSV copiado cuando una ruta histórica quedó desactualizada."""
+        if self.csv_path and Path(self.csv_path).is_file():
+            return
+        candidates = sorted(Path(self.excel_process.path).parent.glob("*.csv"))
+        if len(candidates) == 1:
+            self.csv_path = candidates[0]
+            return
+        raise FileNotFoundError(
+            "No se encontró el CSV utilizado por este proceso. "
+            "Selecciónalo nuevamente con Examinar y reintenta el paso."
         )
 
     def _original_created(self, resultado_creacion):
@@ -1128,7 +1152,7 @@ class ExcelProcessWindow(QWidget):
                 self.modality.currentText(),
                 self.program.currentText(),
                 self.base_directory,
-                self.report_paths.source_csv,
+                self.csv_path,
                 self.excel_process.path,
                 paso_completado,
                 status,
@@ -1141,8 +1165,23 @@ class ExcelProcessWindow(QWidget):
 
     def resume_process(self, proceso):
         """Restaura la configuración y habilita el siguiente paso pendiente."""
+        proceso = dict(proceso)
         ruta_excel = Path(proceso["workbook_path"])
         ruta_csv = Path(proceso["source_csv"])
+        if not ruta_csv.is_file():
+            candidates = sorted(ruta_excel.parent.glob("*.csv"))
+            if len(candidates) == 1:
+                ruta_csv = candidates[0]
+                proceso["source_csv"] = str(ruta_csv)
+                academic_folder = ruta_excel.parent.parent.name.casefold()
+                for value in list_report_options("level"):
+                    if academic_folder.startswith(value.casefold() + "_"):
+                        proceso["level"] = value
+                        break
+                for value in list_report_options("modality"):
+                    if academic_folder.endswith("_" + value.casefold()):
+                        proceso["modality"] = value
+                        break
         if proceso["completed_step"] > 0 and not ruta_excel.is_file():
             show_error(
                 self,
@@ -1172,6 +1211,9 @@ class ExcelProcessWindow(QWidget):
         self.excel_process = ExcelProcess(ruta_excel)
         self.completed_step = int(proceso["completed_step"])
         self._report_saved = False
+        self._configuration_locked = True
+        for selector in (self.period, self.level, self.modality, self.program):
+            selector.setEnabled(False)
 
         for indice, paso in enumerate(self.steps):
             if indice < self.completed_step:
