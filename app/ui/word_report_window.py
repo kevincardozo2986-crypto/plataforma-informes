@@ -71,8 +71,8 @@ class WordGenerationTask(QObject):
     def run(self):
         try:
             result = self.operation()
-        except Exception as error:
-            self.failed.emit(str(error))
+        except BaseException as error:  # noqa: BLE001 - debe mostrarse, no tumbar la app
+            self.failed.emit(f"{type(error).__name__}: {error}")
         else:
             self.finished.emit(result)
 
