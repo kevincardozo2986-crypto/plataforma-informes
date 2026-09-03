@@ -87,5 +87,35 @@ def test_generates_word_from_finished_excel_and_preserves_template(tmp_path):
     assert field_codes.count("SEQ FiguraInforme") == 6
     paragraphs = [paragraph.text.strip() for paragraph in document.paragraphs]
     assert "Tabla de ilustraciones" in paragraphs
+    assert "Tabla de contenido" in paragraphs
+    assert "PAGEREF" not in field_codes
+    assert "La tabla de contenido se actualizará al abrir el documento." in paragraphs
     assert "1. Introducción" in paragraphs
     assert "7. Diseño de cursos virtuales" in paragraphs
+
+
+def test_toc_field_matches_illustrations_structure():
+    template = _bundled_template_path()
+    document = Document(template)
+    paragraphs = list(document.paragraphs)
+
+    def _field_layout(paragraph):
+        return [
+            (node.get("{%s}fldCharType" % node.nsmap.get("w")), node.get("{%s}dirty" % node.nsmap.get("w")))
+            for node in paragraph._p.iter()
+            if node.tag.endswith("}fldChar")
+        ]
+
+    toc = next(p for p in paragraphs if "La tabla de contenido se actualizar" in p.text)
+    tof = next(p for p in paragraphs if "La tabla de ilustraciones se actualizar" in p.text)
+    assert [kind for kind, _ in _field_layout(toc)] == [kind for kind, _ in _field_layout(tof)]
+    assert _field_layout(toc)[0] == ("begin", "true")
+    assert _field_layout(tof)[0] == ("begin", "true")
+    toc_codes = " ".join(
+        node.text or "" for node in toc._p.iter() if node.tag.endswith("}instrText")
+    )
+    tof_codes = " ".join(
+        node.text or "" for node in tof._p.iter() if node.tag.endswith("}instrText")
+    )
+    assert toc_codes.strip() == r"TOC \h \z \u"
+    assert tof_codes.strip() == r'TOC \h \z \c "FiguraInforme"'

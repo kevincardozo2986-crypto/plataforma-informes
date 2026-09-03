@@ -431,6 +431,116 @@ def _configure_illustrations_field(document):
             node.text = ' TOC \\h \\z \\c "FiguraInforme" '
 
 
+def _build_auto_field_paragraph(instruction, placeholder):
+    """Crea un párrafo con un campo auto-actualizable (begin dirty, separate, end)."""
+    paragraph_element = OxmlElement("w:p")
+    properties = OxmlElement("w:pPr")
+    style = OxmlElement("w:pStyle")
+    style.set(qn("w:val"), "Normal")
+    properties.append(style)
+    paragraph_element.append(properties)
+
+    begin_run = OxmlElement("w:r")
+    begin = OxmlElement("w:fldChar")
+    begin.set(qn("w:fldCharType"), "begin")
+    begin.set(qn("w:dirty"), "true")
+    begin_run.append(begin)
+    paragraph_element.append(begin_run)
+
+    instruction_run = OxmlElement("w:r")
+    instruction_node = OxmlElement("w:instrText")
+    instruction_node.set(qn("xml:space"), "preserve")
+    instruction_node.text = instruction
+    instruction_run.append(instruction_node)
+    paragraph_element.append(instruction_run)
+
+    separate_run = OxmlElement("w:r")
+    separate = OxmlElement("w:fldChar")
+    separate.set(qn("w:fldCharType"), "separate")
+    separate_run.append(separate)
+    paragraph_element.append(separate_run)
+
+    text_run = OxmlElement("w:r")
+    text_node = OxmlElement("w:t")
+    text_node.text = placeholder
+    text_run.append(text_node)
+    paragraph_element.append(text_run)
+
+    end_run = OxmlElement("w:r")
+    end = OxmlElement("w:fldChar")
+    end.set(qn("w:fldCharType"), "end")
+    end_run.append(end)
+    paragraph_element.append(end_run)
+    return paragraph_element
+
+
+def _is_uniform_auto_field(element, instruction):
+    """Indica si el elemento ya es un campo auto-actualizable con ese código."""
+    instructions = [node.text or "" for node in element.iter(qn("w:instrText"))]
+    if not any(text.strip() == instruction.strip() for text in instructions):
+        return False
+    begins = [node for node in element.iter(qn("w:fldChar"))
+              if node.get(qn("w:fldCharType")) == "begin"]
+    return any(begin.get(qn("w:dirty")) for begin in begins)
+
+
+def _configure_toc_field(document):
+    """Deja la tabla de contenido con la misma estructura que la de ilustraciones.
+
+    Reemplaza el bloque de entradas fijas (control SDT o párrafos con PAGEREF
+    y números de página desactualizados) por un único párrafo con campo
+    auto-actualizable y marcador begin dirty, para que Word regenere ambas
+    tablas al abrir el documento.
+    """
+    body = document.element.find(qn("w:body"))
+    if body is None:
+        return False
+    children = list(body)
+
+    def _is_toc_instruction(text):
+        return ("TOC" in text and "FiguraInforme" not in text
+                and "PAGEREF" not in text and "SEQ" not in text)
+
+    start = next(
+        (index for index, child in enumerate(children)
+         if any(_is_toc_instruction(node.text or "")
+                for node in child.iter(qn("w:instrText")))),
+        None,
+    )
+    if start is None:
+        return False
+
+    depth = 0
+    started = False
+    end = None
+    for index in range(start, len(children)):
+        for field_char in children[index].iter(qn("w:fldChar")):
+            char_type = field_char.get(qn("w:fldCharType"))
+            if char_type == "begin":
+                depth += 1
+                started = True
+            elif char_type == "end" and started:
+                depth -= 1
+                if depth == 0:
+                    end = index
+                    break
+        if end is not None:
+            break
+    if end is None:
+        return False
+
+    if start == end and _is_uniform_auto_field(children[start], "TOC \\h \\z \\u"):
+        return True
+    field_paragraph = _build_auto_field_paragraph(
+        " TOC \\h \\z \\u ",
+        "La tabla de contenido se actualizará al abrir el documento.",
+    )
+    children[start].addprevious(field_paragraph)
+    for child in children[start:end + 1]:
+        body.remove(child)
+    return True
+
+
 def generate_word_report(workbook_path, output_path, program, period, template_path=None):
     """Genera el DOCX final conservando estructura, estilos y posiciones de la plantilla."""
     workbook_path = Path(workbook_path)
@@ -456,6 +566,7 @@ def generate_word_report(workbook_path, output_path, program, period, template_p
         document = Document(template_path)
         _replace_images(document, images)
         _replace_cover_fields(document, program, period)
+        _configure_toc_field(document)
         _configure_illustrations_field(document)
 
         indicator_rows = []
