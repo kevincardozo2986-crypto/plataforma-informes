@@ -10,6 +10,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from docx import Document
+from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from PIL import Image
 from openpyxl import load_workbook
@@ -79,6 +80,11 @@ def _extract_data(workbook_path):
         indicators = _read_block(summary, "Indicadores principales", 3)
         monthly = _read_block(summary, "Actividad mensual", 4)
         courses = _read_block(summary, "Cursos destacados", 4)
+        courses.sort(
+            key=lambda row: (
+                -float(row[3] or 0), -float(row[1] or 0), str(row[0]).casefold()
+            )
+        )
         teachers = _read_block(summary, "Continuidad docente", 3)
 
         teacher_chart = []
@@ -125,12 +131,18 @@ def _extract_data(workbook_path):
 
 
 def _line_chart(path, categories, series, title, ylabel):
-    figure, axis = plt.subplots(figsize=(9.5, 5), dpi=190)
+    figure, axis = plt.subplots(figsize=(8, 5.4), dpi=240)
     figure.patch.set_facecolor('white')
-    axis.set_facecolor('#FAFBFD')
+    axis.set_facecolor('#FFFFFF')
     
     for name, values, color in series:
-        axis.plot(categories, values, "o-", linewidth=3, markersize=8, label=name, color=color)
+        axis.plot(categories, values, "o-", linewidth=2.8, markersize=8, label=name, color=color)
+        for category, value in zip(categories, values):
+            axis.annotate(
+                _number(value, 1 if isinstance(value, float) and not value.is_integer() else 0),
+                (category, value), xytext=(0, 10), textcoords="offset points",
+                ha="center", fontsize=8, fontweight="bold", color=color,
+            )
     
     axis.set_title(title, color=NAVY, fontweight="bold", fontsize=14, pad=16)
     axis.set_ylabel(ylabel, fontsize=11, color=NAVY, fontweight="600")
@@ -149,16 +161,16 @@ def _line_chart(path, categories, series, title, ylabel):
     axis.spines["bottom"].set_color('#E3E6ED')
     
     figure.tight_layout()
-    figure.savefig(path, dpi=190, bbox_inches="tight", facecolor='white')
+    figure.savefig(path, dpi=300, bbox_inches="tight", facecolor='white')
     plt.close(figure)
 
 
 def _bar_chart(path, courses, title):
     names = [str(row[0]).replace("_", " ").title() for row in courses]
-    values = [float(row[1] or 0) for row in courses]
-    figure, axis = plt.subplots(figsize=(9.5, 5.5), dpi=190)
+    values = [float(row[3] or 0) for row in courses]
+    figure, axis = plt.subplots(figsize=(8, 5.4), dpi=240)
     figure.patch.set_facecolor('white')
-    axis.set_facecolor('#FAFBFD')
+    axis.set_facecolor('#FFFFFF')
     
     bars = axis.barh(names[::-1], values[::-1], color="#36BCE8", edgecolor="#0A7FA8", linewidth=1.2)
     axis.set_title(title, color=NAVY, fontweight="bold", fontsize=14, pad=16)
@@ -169,7 +181,7 @@ def _bar_chart(path, courses, title):
         axis.text(width + max(values or [1]) * 0.015, bar.get_y() + bar.get_height() / 2,
                   _number(value), va="center", fontsize=10, fontweight="600", color=NAVY)
     
-    axis.set_xlabel("Eventos estudiantiles", fontsize=11, fontweight="600", color=NAVY)
+    axis.set_xlabel("Días activos", fontsize=11, fontweight="600", color=NAVY)
     axis.tick_params(axis='x', labelsize=10, colors=NAVY)
     axis.tick_params(axis='y', labelsize=10, colors=NAVY)
     axis.grid(axis="x", alpha=0.15, linestyle="--", linewidth=0.7)
@@ -180,7 +192,7 @@ def _bar_chart(path, courses, title):
     axis.spines["bottom"].set_color('#E3E6ED')
     
     figure.tight_layout()
-    figure.savefig(path, dpi=190, bbox_inches="tight", facecolor='white')
+    figure.savefig(path, dpi=300, bbox_inches="tight", facecolor='white')
     plt.close(figure)
 
 
@@ -246,7 +258,7 @@ def _create_charts(directory, data, program, period):
                 [("Promedio de estudiantes", [row[1] for row in users], GOLD)],
                 "Promedio de estudiantes que usaron el Campus Virtual de la facultad\n"
                 f"de {program} {period}", "Promedio de estudiantes")
-    _bar_chart(paths[4], data["courses"], "Cursos con mayor actividad estudiantil")
+    _bar_chart(paths[4], data["courses"], "Cursos con mayor continuidad estudiantil")
     _pie_chart(paths[5], data["design"], "Diseño de Cursos")
     return paths
 
@@ -359,6 +371,66 @@ def _replace_cover_fields(document, program, period):
             node.text = updated
 
 
+def _style_figure_captions(document):
+    """Aplica un pie de figura discreto y diferente al texto del informe."""
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.shared import Pt, RGBColor
+
+    for paragraph in document.paragraphs:
+        if not paragraph.text.strip().startswith("Ilustración "):
+            continue
+        paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        paragraph.paragraph_format.space_before = Pt(3)
+        paragraph.paragraph_format.space_after = Pt(8)
+        paragraph.paragraph_format.keep_with_next = False
+        for run in paragraph.runs:
+            run.italic = True
+            run.bold = False
+            run.font.size = Pt(9)
+            run.font.color.rgb = RGBColor(84, 101, 120)
+
+
+def _set_figure_caption(document, index, description):
+    """Crea un pie con numeración SEQ para que Word construya la tabla de figuras."""
+    paragraph = next(
+        paragraph for paragraph in document.paragraphs
+        if paragraph.text.strip().startswith(f"Ilustración {index}")
+    )
+    paragraph.clear()
+    paragraph.style = document.styles["Caption"]
+    paragraph.add_run("Ilustración ")
+
+    begin_run = paragraph.add_run()
+    begin = OxmlElement("w:fldChar")
+    begin.set(qn("w:fldCharType"), "begin")
+    begin.set(qn("w:dirty"), "true")
+    begin_run._r.append(begin)
+
+    instruction_run = paragraph.add_run()
+    instruction = OxmlElement("w:instrText")
+    instruction.set(qn("xml:space"), "preserve")
+    instruction.text = " SEQ FiguraInforme \\* ARABIC "
+    instruction_run._r.append(instruction)
+
+    separator_run = paragraph.add_run()
+    separator = OxmlElement("w:fldChar")
+    separator.set(qn("w:fldCharType"), "separate")
+    separator_run._r.append(separator)
+    separator_run.add_text(str(index))
+
+    end_run = paragraph.add_run()
+    end = OxmlElement("w:fldChar")
+    end.set(qn("w:fldCharType"), "end")
+    end_run._r.append(end)
+    paragraph.add_run(f" {description}")
+
+
+def _configure_illustrations_field(document):
+    for node in document.element.iter(qn("w:instrText")):
+        if "TOC" in (node.text or "") and ("Caption,1" in node.text or "FiguraInforme" in node.text):
+            node.text = ' TOC \\h \\z \\c "FiguraInforme" '
+
+
 def generate_word_report(workbook_path, output_path, program, period, template_path=None):
     """Genera el DOCX final conservando estructura, estilos y posiciones de la plantilla."""
     workbook_path = Path(workbook_path)
@@ -384,6 +456,7 @@ def generate_word_report(workbook_path, output_path, program, period, template_p
         document = Document(template_path)
         _replace_images(document, images)
         _replace_cover_fields(document, program, period)
+        _configure_illustrations_field(document)
 
         indicator_rows = []
         for label, result, reading in data["indicators"]:
@@ -475,9 +548,9 @@ def generate_word_report(workbook_path, output_path, program, period, template_p
             ]
             course_details.extend([""] * (3 - len(course_details)))
             course_intro = (
-                f"El curso con mayor volumen de actividad estudiantil fue {course_rows[0][0]}, con "
-                f"{course_rows[0][1]} eventos, {course_rows[0][2]} estudiantes \u00fanicos y "
-                f"{course_rows[0][3]} d\u00edas activos."
+                f"El curso con mayor continuidad estudiantil fue {course_rows[0][0]}, con "
+                f"{course_rows[0][3]} d\u00edas activos, {course_rows[0][1]} eventos y "
+                f"{course_rows[0][2]} estudiantes \u00fanicos."
             )
             if _replace_marker(document, "{{ANALISIS_ESTUDIANTES}}", course_intro):
                 for index, detail in enumerate(course_details, 1):
@@ -493,19 +566,35 @@ def generate_word_report(workbook_path, output_path, program, period, template_p
         )
         if not _replace_marker(document, "{{ANALISIS_DISENO}}", design_text):
             _replace_containing(document, "cuenta con un total de 59 cursos", design_text)
-        captions = (
-            ("Ilustración 1", "Ilustración 1. Eventos mensuales por tipo de usuario."),
-            ("Ilustración 2", "Ilustración 2. Días al mes de uso del Campus Virtual por parte de los docentes "
-             f"de la facultad de {program} {period}."),
-            ("Ilustración 3", "Ilustración 3. Días del mes de uso del Campus Virtual por parte de los estudiantes "
-             f"de la facultad de {program} {period}."),
-            ("Ilustración 4", "Ilustración 4. Promedio de estudiantes que usaron el Campus Virtual de la facultad "
-             f"de {program} {period}."),
-            ("Ilustración 5", "Ilustración 5. Cursos con mayor actividad estudiantil."),
-            ("Ilustración 6", "Ilustración 6. Diseño de Cursos."),
+        chart_titles = (
+            "Eventos mensuales por tipo de usuario",
+            "Días al mes de uso del Campus Virtual por parte de los docentes "
+            f"de la facultad de {program} {period}",
+            "Días del mes de uso del Campus Virtual por parte de los estudiantes "
+            f"de la facultad de {program} {period}",
+            "Promedio de estudiantes que usaron el Campus Virtual de la facultad "
+            f"de {program} {period}",
+            "Cursos con mayor continuidad estudiantil",
+            "Diseño de Cursos",
         )
-        for prefix, caption in captions:
-            _replace_paragraph(document, prefix, caption)
+        for index, title in enumerate(chart_titles, 1):
+            marker = f"{{{{TITULO_GRAFICA_{index}}}}}"
+            if not _replace_marker(document, marker, title):
+                _replace_paragraph(
+                    document, f"Ilustración {index}",
+                    f"Ilustración {index}. {title}.",
+                )
+        figure_captions = (
+            f"Eventos mensuales por tipo de usuario {period}",
+            f"Días al mes de uso de la plataforma Open LMS - Docentes {period}",
+            f"Días al mes de uso de la plataforma Open LMS - Estudiantes {period}",
+            f"Promedio de uso de la plataforma Open LMS - Estudiantes {period}",
+            f"Cursos con mayor continuidad estudiantil {period}",
+            f"Porcentaje de cursos con contenido {period}",
+        )
+        for index, caption in enumerate(figure_captions, 1):
+            _set_figure_caption(document, index, caption)
+        _style_figure_captions(document)
         for paragraph in document.paragraphs:
             if "2026-1" in paragraph.text and period != "2026-1":
                 paragraph.text = paragraph.text.replace("2026-1", period)

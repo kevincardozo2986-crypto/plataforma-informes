@@ -29,6 +29,8 @@ reports/*.xls
 reports/*.docx
 reports/*.pdf
 /Informe_*.xlsx
+debug_output/
+debug_output2/
 
 # Base de datos
 *.db

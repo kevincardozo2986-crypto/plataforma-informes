@@ -6,4 +6,6 @@ xlsxwriter
 matplotlib
 Pillow
 python-docx
+docx2pdf
+pywin32; sys_platform == "win32"
 pytest

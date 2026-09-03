@@ -364,13 +364,13 @@ QScrollArea#excelMainScroll QScrollBar::add-line:vertical,
 QScrollArea#excelMainScroll QScrollBar::sub-line:vertical { height: 0; }
 QFrame#excelHero {
     background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-        stop:0 #FFFFFF, stop:0.78 #F4F8FC, stop:1 #E7F0F9);
-    border: none; border-radius: 10px;
+        stop:0 #082E59, stop:0.72 #0B3C70, stop:1 #115A91);
+    border: none; border-radius: 18px;
 }
 QLabel#excelHeroImage { background: transparent; border: none; }
-QLabel#excelPageTitle { color: #071D38; font-family: "Segoe UI"; font-size: 29px; font-weight: 700; }
-QLabel#excelPageSubtitle { color: #68778B; font-family: "Segoe UI"; font-size: 13px; font-weight: 400; }
-QLabel#excelEyebrow { color: #1A5B9D; font-size: 9px; font-weight: 900; letter-spacing: 2px; }
+QLabel#excelPageTitle { color: #FFFFFF; font-family: "Segoe UI"; font-size: 29px; font-weight: 700; }
+QLabel#excelPageSubtitle { color: #D9E8F6; font-family: "Segoe UI"; font-size: 13px; font-weight: 400; }
+QLabel#excelEyebrow { color: #66D0F4; font-size: 9px; font-weight: 900; letter-spacing: 2px; }
 QFrame#excelSectionHeader { background: transparent; border: none; }
 QLabel#sectionNumber {
     background-color: #07427E; color: #FFFFFF; border-radius: 2px;
@@ -392,11 +392,10 @@ QPushButton#excelBackButton:pressed {
     border-color: #5E94C8;
 }
 QFrame#excelSetupCard, QFrame#excelStepRow {
-    background: transparent; border: none;
+    background-color: #FFFFFF; border: none;
 }
 QFrame#sourceFilesPanel {
-    background-color: #F1F5F9; border-top: 1px solid #CBD5E1;
-    border-bottom: 1px solid #CBD5E1;
+    background-color: #FFFFFF; border: 1px solid #D9E2EC; border-radius: 12px;
 }
 QLabel#sourceFilesTitle { color: #274766; font-size: 10px; font-weight: 900; letter-spacing: 1px; }
 QFrame#excelStepRow { border-bottom: 1px solid #D7E0E9; }

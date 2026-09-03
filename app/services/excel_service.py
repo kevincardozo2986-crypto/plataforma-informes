@@ -236,7 +236,14 @@ class ExcelProcess:
             "promedio_dias_estudiantes": promedio_e, "mediana_dias_estudiantes": mediana_e,
             "promedio_dias_docentes": promedio_d, "mediana_dias_docentes": mediana_d,
             "meses": [{"mes": MESES_ABREVIADOS[m], "eventos_estudiantes": datos["eventos_mes"][m]["student"], "estudiantes_activos": len(datos["usuarios_mes"][m]), "eventos_docentes": datos["eventos_mes"][m]["editingteacher"]} for m in meses],
-            "cursos": [{"curso": c, "eventos": n, "estudiantes": len(datos["usuarios_curso"][c]), "dias": len(datos["dias_curso"][c])} for c, n in datos["eventos_curso"].most_common(6)],
+            "cursos": [
+                {"curso": c, "eventos": datos["eventos_curso"][c],
+                 "estudiantes": len(datos["usuarios_curso"][c]), "dias": len(datos["dias_curso"][c])}
+                for c in sorted(
+                    datos["eventos_curso"],
+                    key=lambda name: (-len(datos["dias_curso"][name]), -datos["eventos_curso"][name], name.casefold()),
+                )[:6]
+            ],
             "docentes_destacados": [{"curso": c, "docente": d, "dias": len(ds)} for (c, d), ds in sorted(datos["dias_docente_curso"].items(), key=lambda e: (-len(e[1]), e[0][0].casefold()))[:6]],
         }
 
@@ -1315,11 +1322,14 @@ class ExcelProcess:
         cursos = [
             {
                 "curso": curso,
-                "eventos": cantidad,
+                "eventos": eventos_curso[curso],
                 "estudiantes": len(usuarios_curso[curso]),
                 "dias": len(dias_curso[curso]),
             }
-            for curso, cantidad in eventos_curso.most_common(6)
+            for curso in sorted(
+                eventos_curso,
+                key=lambda name: (-len(dias_curso[name]), -eventos_curso[name], name.casefold()),
+            )[:6]
         ]
         docentes = [
             {"curso": curso, "docente": docente, "dias": len(dias)}
@@ -1436,14 +1446,14 @@ class ExcelProcess:
         grafica_cursos = libro.add_chart({"type": "bar"})
         ultima_fila_curso = fila_cursos + 1 + len(datos["cursos"])
         grafica_cursos.add_series({
-            "name": "Eventos estudiantiles",
+            "name": "Días activos",
             "categories": ["Resumen Informe", fila_cursos + 2, 0, ultima_fila_curso, 0],
-            "values": ["Resumen Informe", fila_cursos + 2, 1, ultima_fila_curso, 1],
+            "values": ["Resumen Informe", fila_cursos + 2, 3, ultima_fila_curso, 3],
             "fill": {"color": "#5B9BD5"}, "border": {"none": True},
             "data_labels": {"value": True, "num_format": "#,##0"},
         })
-        grafica_cursos.set_title({"name": "Cursos con mayor actividad estudiantil"})
-        grafica_cursos.set_x_axis({"name": "Eventos estudiantiles"})
+        grafica_cursos.set_title({"name": "Cursos con mayor continuidad estudiantil"})
+        grafica_cursos.set_x_axis({"name": "Días activos"})
         grafica_cursos.set_legend({"none": True})
         grafica_cursos.set_size({"width": 700, "height": 360})
         hoja.insert_chart("F22", grafica_cursos)

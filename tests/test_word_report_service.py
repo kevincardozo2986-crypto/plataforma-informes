@@ -59,8 +59,8 @@ def test_generates_word_from_finished_excel_and_preserves_template(tmp_path):
     assert "optimizacion_6a_6b" not in normalized_text
     assert "400.568" not in report_text
     assert "59 cursos" not in report_text
-    assert "Días al mes de uso del Campus Virtual por parte de los docentes" in report_text
-    assert "Cursos con mayor actividad estudiantil" in report_text
+    assert "Días al mes de uso de la plataforma Open LMS - Docentes" in report_text
+    assert "Cursos con mayor continuidad estudiantil" in report_text
     assert "Administracion de Empresas" in xml_text
     assert "2027-2" in xml_text
     assert "10 hojas" not in report_text
@@ -68,3 +68,24 @@ def test_generates_word_from_finished_excel_and_preserves_template(tmp_path):
     assert "Hoja «Estudiantes»" not in report_text
     assert "9 hojas" in report_text
     assert "{{" not in xml_text
+    caption = next(
+        paragraph for paragraph in document.paragraphs
+        if paragraph.text.startswith("Ilustración 2 ")
+    )
+    assert caption.text == (
+        "Ilustración 2 Días al mes de uso de la plataforma Open LMS "
+        "- Docentes 2027-2"
+    )
+    assert all(run.italic for run in caption.runs)
+    assert all(run.font.size.pt == 9 for run in caption.runs)
+    assert caption.style.name == "Caption"
+    field_codes = " ".join(
+        node.text or "" for node in document.element.iter()
+        if node.tag.endswith("}instrText")
+    )
+    assert 'TOC \\h \\z \\c "FiguraInforme"' in field_codes
+    assert field_codes.count("SEQ FiguraInforme") == 6
+    paragraphs = [paragraph.text.strip() for paragraph in document.paragraphs]
+    assert "Tabla de ilustraciones" in paragraphs
+    assert "1. Introducción" in paragraphs
+    assert "7. Diseño de cursos virtuales" in paragraphs

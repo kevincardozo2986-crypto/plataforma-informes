@@ -4,15 +4,16 @@ from pathlib import Path
 
 from openpyxl import load_workbook
 from PySide6.QtCore import QObject, QSize, QThread, Qt, QUrl, Signal, Slot
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtGui import QColor, QDesktopServices, QFont, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QComboBox, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel,
     QLineEdit, QListWidget, QListWidgetItem, QProgressBar, QPushButton,
-    QVBoxLayout, QWidget,
+    QSizePolicy, QVBoxLayout, QWidget,
 )
 
 from app.services.report_option_service import list_report_options
-from app.services.report_path_service import build_word_path
+from app.services.report_path_service import build_pdf_path, build_word_path
+from app.services.pdf_report_service import convert_word_to_pdf
 from app.services.process_history_service import list_completed_processes
 from app.services.word_report_service import generate_word_report
 from app.ui.modal_dialogs import ask_confirmation, show_error, show_info
@@ -20,31 +21,41 @@ from app.ui.theme import EXCEL_MODULE_STYLESHEET
 
 
 WORD_STYLE = EXCEL_MODULE_STYLESHEET + """
-QFrame#wordHero { background-color: #0B315A; border-radius: 14px; }
-QLabel#wordEyebrow { color: #65C9F1; font-size: 10px; font-weight: 900; }
-QLabel#wordTitle { color: #FFFFFF; font-size: 28px; font-weight: 900; }
-QLabel#wordSubtitle { color: #D5E5F4; font-size: 12px; }
-QFrame#wordPanel { background-color: #FFFFFF; border: 1px solid #DDE5ED; border-radius: 12px; }
-QLabel#wordSection { color: #102A49; font-size: 15px; font-weight: 900; }
+QFrame#wordHero { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #123F91, stop:0.55 #0759B6, stop:1 #261478); border: none; border-radius: 16px; }
+QLabel#wordHeroImage { background: transparent; border: none; }
+QLabel#wordEyebrow { color: #78E3F8; font-size: 9px; font-weight: 900; letter-spacing: 2px; }
+QLabel#wordTitle { color: #FFFFFF; font-size: 26px; font-weight: 800; }
+QLabel#wordSubtitle { color: #E5F1FF; font-size: 11px; }
+QLabel#wordStepNumber { color: #0D4380; background-color: #8EE8F7; border-radius: 10px; font-size: 9px; font-weight: 900; }
+QLabel#wordStepText { color: #FFFFFF; font-size: 9px; font-weight: 800; }
+QLabel#wordStepArrow { color: #78CDEB; font-size: 11px; }
+QFrame#wordPanel { background-color: #FFFFFF; border: 1px solid #D9E2EC; border-radius: 14px; }
+QLabel#wordSection { color: #102A49; font-size: 16px; font-weight: 800; }
+QLabel#wordPanelHint { color: #718096; font-size: 10px; }
 QLabel#wordMuted { color: #718096; font-size: 10px; }
 QLineEdit#reportSearch, QComboBox#reportFilter {
-    background-color: #F8FAFC; color: #173653; border: 1px solid #CDD8E4;
-    border-radius: 7px; padding: 9px 11px; min-height: 18px;
+    background-color: #F8FAFC; color: #173653; border: 1px solid #D3DDE8;
+    border-radius: 9px; padding: 9px 12px; min-height: 22px;
 }
 QLineEdit#reportSearch:focus, QComboBox#reportFilter:focus { border: 2px solid #0B67D1; }
-QListWidget#reportList { background: #F8FAFC; border: 1px solid #DDE5ED; border-radius: 9px; padding: 5px; }
-QListWidget#reportList::item { color: #173653; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px; margin: 3px; }
+QComboBox#reportFilter { color: #0B67D1; font-weight: 800; background-color: #F4F8FF; }
+QListWidget#reportList { background: #F5F8FB; border: 1px solid #DFE7EF; border-radius: 10px; padding: 6px; outline: 0; }
+QListWidget#reportList::item { color: #173653; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 9px; padding: 12px; margin: 3px; }
 QListWidget#reportList::item:hover { border-color: #83B8EA; background: #F3F8FE; }
 QListWidget#reportList::item:selected { color: #073A6F; border: 2px solid #0B67D1; background: #EAF3FC; }
 QLabel#countBadge { color: #075EAE; background: #E5F2FF; border-radius: 10px; padding: 4px 9px; font-weight: 800; }
-QLabel#selectionTitle { color: #0B315A; font-size: 17px; font-weight: 900; }
+QLabel#selectionTitle { color: #0B315A; font-size: 18px; font-weight: 800; }
+QLabel#selectionBadge { color: #137346; background-color: #E3F4EA; border-radius: 10px; padding: 5px 10px; font-size: 9px; font-weight: 900; }
 QLabel#detailLabel { color: #64748B; font-size: 10px; font-weight: 700; }
-QLabel#detailValue { color: #183455; font-size: 11px; background: #F6F8FB; border-radius: 6px; padding: 8px; }
-QPushButton#wordPrimary { background: #0B67D1; color: white; border: none; border-radius: 8px; padding: 11px 18px; font-weight: 900; }
+QLabel#detailValue { color: #183455; font-size: 11px; background: #F5F8FB; border: 1px solid #E7EDF3; border-radius: 8px; padding: 9px; }
+QFrame#wordActionArea { background-color: #F5F9FD; border: 1px solid #DDE8F2; border-radius: 10px; }
+QPushButton#wordPrimary { background: #0B67D1; color: white; border: none; border-radius: 9px; padding: 12px 18px; font-size: 12px; font-weight: 900; }
 QPushButton#wordPrimary:hover { background: #0959B7; }
 QPushButton#wordPrimary:disabled { background: #D8E0E9; color: #929EAC; }
-QPushButton#wordAction { background: #FFFFFF; color: #0B5DAC; border: 1px solid #9ABDE0; border-radius: 7px; padding: 9px 14px; font-weight: 800; }
+QPushButton#wordAction { background: #FFFFFF; color: #0B5DAC; border: 1px solid #B7CCE1; border-radius: 8px; padding: 9px 14px; font-weight: 800; }
 QPushButton#wordAction:hover { background: #EDF6FF; }
+QPushButton#wordSelectAction { background: #176CE0; color: #FFFFFF; border: none; border-radius: 8px; padding: 9px 14px; font-weight: 900; }
+QPushButton#wordSelectAction:hover { background: #0D5FCB; }
 """
 
 
@@ -77,6 +88,7 @@ class WordReportWindow(QWidget):
         self.reports = []
         self.excel_path = None
         self.generated_path = None
+        self.generated_pdf_path = None
         self.current_program = ""
         self.current_period = ""
         self._thread = None
@@ -92,13 +104,43 @@ class WordReportWindow(QWidget):
         root.addWidget(back, alignment=Qt.AlignLeft)
 
         hero = QFrame(objectName="wordHero")
-        hero_box = QVBoxLayout(hero)
-        hero_box.setContentsMargins(25, 18, 25, 18)
-        hero_box.addWidget(QLabel("GENERADOR INSTITUCIONAL  /  EXCEL A WORD", objectName="wordEyebrow"))
-        hero_box.addWidget(QLabel("Crea el informe final en pocos pasos", objectName="wordTitle"))
+        hero_box = QHBoxLayout(hero)
+        hero_box.setContentsMargins(25, 14, 25, 14)
+        hero_box.setSpacing(12)
+        hero_copy = QVBoxLayout()
+        hero_copy.setSpacing(2)
+        eyebrow = QLabel("GENERADOR INSTITUCIONAL  /  EXCEL A WORD", objectName="wordEyebrow")
+        title = QLabel("Construye el informe final", objectName="wordTitle")
+        for label in (eyebrow, title):
+            label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        hero_copy.addWidget(eyebrow)
+        hero_copy.addWidget(title)
         subtitle = QLabel("Busca un Excel terminado, revisa sus datos y genera el documento con graficos y plantilla institucional.", objectName="wordSubtitle")
         subtitle.setWordWrap(True)
-        hero_box.addWidget(subtitle)
+        subtitle.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        hero_copy.addWidget(subtitle)
+        steps = QHBoxLayout()
+        steps.setSpacing(7)
+        for index, step_text in enumerate(("Seleccionar", "Revisar", "Generar"), 1):
+            number = QLabel(str(index), objectName="wordStepNumber")
+            number.setAlignment(Qt.AlignCenter)
+            number.setFixedSize(20, 20)
+            steps.addWidget(number)
+            steps.addWidget(QLabel(step_text, objectName="wordStepText"))
+            if index < 3:
+                steps.addWidget(QLabel(">", objectName="wordStepArrow"))
+        steps.addStretch()
+        hero_copy.addLayout(steps)
+        hero_box.addLayout(hero_copy, 4)
+        hero_image = QLabel(objectName="wordHeroImage")
+        hero_image.setAlignment(Qt.AlignCenter)
+        hero_image.setPixmap(
+            QPixmap(str(Path(__file__).parent / "assets" / "excel-to-word-hero.png")).scaled(
+                330, 135, Qt.KeepAspectRatio, Qt.SmoothTransformation
+            )
+        )
+        hero_image.setFixedSize(340, 135)
+        hero_box.addWidget(hero_image, 3)
         root.addWidget(hero)
 
         content = QHBoxLayout()
@@ -113,8 +155,11 @@ class WordReportWindow(QWidget):
         heading.addStretch()
         heading.addWidget(self.count_badge)
         left.addLayout(heading)
+        explorer_hint = QLabel("Encuentra un proceso finalizado usando el buscador o los filtros.", objectName="wordPanelHint")
+        explorer_hint.setWordWrap(True)
+        left.addWidget(explorer_hint)
         self.search = QLineEdit(objectName="reportSearch")
-        self.search.setPlaceholderText("Buscar por nombre, programa, periodo o propietario...")
+        self.search.setPlaceholderText("Buscar por nombre, programa o periodo...")
         self.search.setClearButtonEnabled(True)
         self.search.textChanged.connect(self._apply_filters)
         left.addWidget(self.search)
@@ -122,20 +167,21 @@ class WordReportWindow(QWidget):
         filters = QHBoxLayout()
         self.period_filter = QComboBox(objectName="reportFilter")
         self.program_filter = QComboBox(objectName="reportFilter")
-        self.owner_filter = QComboBox(objectName="reportFilter")
-        for combo in (self.period_filter, self.program_filter, self.owner_filter):
+        for combo in (self.period_filter, self.program_filter):
+            combo.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+            combo.setMinimumContentsLength(10)
             combo.currentTextChanged.connect(self._apply_filters)
-            filters.addWidget(combo)
+            filters.addWidget(combo, 1)
         left.addLayout(filters)
         self.report_list = QListWidget(objectName="reportList")
-        self.report_list.setMinimumWidth(430)
+        self.report_list.setMinimumWidth(360)
         self.report_list.currentItemChanged.connect(self._report_selected)
         self.report_list.itemDoubleClicked.connect(lambda _: self._generate())
         left.addWidget(self.report_list, 1)
         list_actions = QHBoxLayout()
         refresh = QPushButton("Actualizar", objectName="wordAction")
         refresh.clicked.connect(self._load_completed_reports)
-        browse = QPushButton("Seleccionar otro Excel", objectName="wordAction")
+        browse = QPushButton("+  Seleccionar otro Excel", objectName="wordSelectAction")
         browse.clicked.connect(self._select_excel)
         list_actions.addWidget(refresh)
         list_actions.addWidget(browse)
@@ -145,13 +191,21 @@ class WordReportWindow(QWidget):
         details = QFrame(objectName="wordPanel")
         right = QVBoxLayout(details)
         right.setContentsMargins(20, 16, 20, 16)
-        right.addWidget(QLabel("Vista previa del informe", objectName="wordSection"))
+        detail_heading = QHBoxLayout()
+        detail_heading.addWidget(QLabel("Resumen del documento", objectName="wordSection"))
+        detail_heading.addStretch()
+        self.selection_badge = QLabel("SIN SELECCIÓN", objectName="selectionBadge")
+        detail_heading.addWidget(self.selection_badge)
+        right.addLayout(detail_heading)
+        preview_hint = QLabel("Confirma la información que se insertará en la plantilla institucional.", objectName="wordPanelHint")
+        preview_hint.setWordWrap(True)
+        right.addWidget(preview_hint)
         self.selection_title = QLabel("Selecciona un Excel", objectName="selectionTitle")
         self.selection_title.setWordWrap(True)
         right.addWidget(self.selection_title)
         self.detail_values = {}
         detail_grid = QGridLayout()
-        fields = (("program", "PROGRAMA"), ("period", "PERIODO"), ("owner", "CREADO POR"), ("events", "EVENTOS REGISTRADOS"), ("file", "ARCHIVO DE ORIGEN"), ("output", "DOCUMENTO DE SALIDA"))
+        fields = (("program", "PROGRAMA"), ("period", "PERIODO"), ("events", "EVENTOS REGISTRADOS"), ("file", "ARCHIVO DE ORIGEN"), ("output", "DOCUMENTO DE SALIDA"))
         for row, (key, label) in enumerate(fields):
             detail_grid.addWidget(QLabel(label, objectName="detailLabel"), row * 2, 0)
             value = QLabel("-", objectName="detailValue")
@@ -160,42 +214,46 @@ class WordReportWindow(QWidget):
             detail_grid.addWidget(value, row * 2 + 1, 0)
         right.addLayout(detail_grid)
         right.addStretch()
+        action_area = QFrame(objectName="wordActionArea")
+        action_box = QVBoxLayout(action_area)
+        action_box.setContentsMargins(12, 11, 12, 12)
         self.progress = QProgressBar()
         self.progress.setRange(0, 0)
         self.progress.hide()
-        right.addWidget(self.progress)
+        action_box.addWidget(self.progress)
         self.feedback = QLabel("Selecciona un Excel terminado para continuar.", objectName="excelFeedback")
         self.feedback.setWordWrap(True)
-        right.addWidget(self.feedback)
-        self.generate_button = QPushButton("Crear documento Word", objectName="wordPrimary")
+        action_box.addWidget(self.feedback)
+        self.generate_button = QPushButton("Crear documento Word  →", objectName="wordPrimary")
         self.generate_button.setEnabled(False)
         self.generate_button.clicked.connect(self._generate)
-        right.addWidget(self.generate_button)
+        action_box.addWidget(self.generate_button)
         generated_actions = QHBoxLayout()
         self.open_button = QPushButton("Abrir Word", objectName="wordAction")
-        self.folder_button = QPushButton("Abrir carpeta", objectName="wordAction")
+        self.pdf_button = QPushButton("Generar PDF", objectName="wordAction")
         self.open_button.clicked.connect(self._open_generated)
-        self.folder_button.clicked.connect(self._open_folder)
+        self.pdf_button.clicked.connect(self._generate_pdf)
         self.open_button.hide()
-        self.folder_button.hide()
+        self.pdf_button.hide()
         generated_actions.addWidget(self.open_button)
-        generated_actions.addWidget(self.folder_button)
-        right.addLayout(generated_actions)
+        generated_actions.addWidget(self.pdf_button)
+        action_box.addLayout(generated_actions)
+        right.addWidget(action_area)
         content.addWidget(details, 2)
         self._load_completed_reports()
 
     def reset(self):
         self.search.clear()
         self.generated_path = None
+        self.generated_pdf_path = None
         self.open_button.hide()
-        self.folder_button.hide()
+        self.pdf_button.hide()
         self._load_completed_reports()
 
     def _load_completed_reports(self, *_):
         self.reports = [r for r in list_completed_processes(self.user) if Path(r["workbook_path"]).is_file()]
         self._populate_filter(self.period_filter, "Todos los periodos", "period")
         self._populate_filter(self.program_filter, "Todos los programas", "program")
-        self._populate_filter(self.owner_filter, "Todos los propietarios", "owner_name")
         self._apply_filters()
 
     def _populate_filter(self, combo, all_text, key):
@@ -209,28 +267,61 @@ class WordReportWindow(QWidget):
         combo.setCurrentIndex(index if index >= 0 else 0)
         combo.blockSignals(False)
 
+    def _excel_icon(self):
+        """Crea un icono verde tipo Excel sin depender de un SVG externo."""
+        pixmap = QPixmap(32, 32)
+        pixmap.fill(Qt.transparent)
+
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        # Hoja/documento
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QColor("#EAF6EF"))
+        painter.drawRoundedRect(4, 2, 24, 28, 5, 5)
+
+        # Franja Excel
+        painter.setBrush(QColor("#107C41"))
+        painter.drawRoundedRect(3, 7, 20, 19, 4, 4)
+
+        # Letra X
+        painter.setPen(QColor("#FFFFFF"))
+        font = QFont()
+        font.setBold(True)
+        font.setPointSize(11)
+        painter.setFont(font)
+        painter.drawText(3, 7, 20, 19, Qt.AlignCenter, "X")
+
+        painter.end()
+        return QIcon(pixmap)
+
     def _apply_filters(self, *_):
         query = self.search.text().strip().casefold()
-        period, program, owner = self.period_filter.currentData(), self.program_filter.currentData(), self.owner_filter.currentData()
+        period, program = self.period_filter.currentData(), self.program_filter.currentData()
         filtered = []
         for report in self.reports:
-            haystack = " ".join(str(report.get(k) or "") for k in ("workbook_path", "period", "program", "owner_name")).casefold()
+            haystack = " ".join(str(report.get(k) or "") for k in ("workbook_path", "period", "program", "level", "modality")).casefold()
             if query and query not in haystack:
                 continue
             if period and report.get("period") != period:
                 continue
             if program and report.get("program") != program:
                 continue
-            if owner and (report.get("owner_name") or "Usuario") != owner:
-                continue
             filtered.append(report)
         self.report_list.clear()
         for report in filtered:
             path = Path(report["workbook_path"])
-            text = f'{report.get("program", "Sin programa")}\n{report.get("period", "Sin periodo")}  |  {report.get("owner_name") or "Usuario"}\n{path.name}'
+            context = "  |  ".join(
+                value for value in (
+                    str(report.get("period") or ""),
+                    str(report.get("level") or ""),
+                    str(report.get("modality") or ""),
+                ) if value
+            )
+            text = f'{report.get("program", "Sin programa")}\n{context}\n{path.name}'
             item = QListWidgetItem(text)
+            item.setIcon(self._excel_icon())
             item.setData(Qt.UserRole, report)
-            item.setToolTip(str(path))
             item.setSizeHint(QSize(0, 78))
             self.report_list.addItem(item)
         self.count_badge.setText(f"{len(filtered)} disponibles")
@@ -247,19 +338,20 @@ class WordReportWindow(QWidget):
     def _set_selection(self, path, report):
         self.excel_path = path
         self.generated_path = None
+        self.generated_pdf_path = None
         self.current_program = str(report.get("program") or "")
         self.current_period = str(report.get("period") or "")
+        self.selection_badge.setText("LISTO PARA GENERAR")
         self.selection_title.setText(path.stem)
         self.detail_values["program"].setText(self.current_program or "Sin identificar")
         self.detail_values["period"].setText(self.current_period or "Sin identificar")
-        self.detail_values["owner"].setText(str(report.get("owner_name") or "Archivo externo"))
         self.detail_values["file"].setText(path.name)
         self.detail_values["output"].setText(self._destination().name)
         self.detail_values["events"].setText(self._read_event_total(path))
         self.generate_button.setEnabled(bool(self.current_program and self.current_period))
         self.feedback.setText("Excel listo. Revisa los datos y crea el documento Word.")
         self.open_button.hide()
-        self.folder_button.hide()
+        self.pdf_button.hide()
 
     def _read_event_total(self, path):
         try:
@@ -277,6 +369,7 @@ class WordReportWindow(QWidget):
 
     def _clear_selection(self, message):
         self.excel_path = None
+        self.selection_badge.setText("SIN SELECCIÓN")
         self.selection_title.setText("Selecciona un Excel")
         for value in self.detail_values.values():
             value.setText("-")
@@ -298,6 +391,9 @@ class WordReportWindow(QWidget):
 
     def _destination(self):
         return build_word_path(self.excel_path.parent, self.current_period, self.current_program)
+
+    def _pdf_destination(self):
+        return build_pdf_path(self.excel_path.parent, self.current_period, self.current_program)
 
     def _generate(self):
         if not self.excel_path:
@@ -325,7 +421,7 @@ class WordReportWindow(QWidget):
         self.generated_path = Path(path)
         self.feedback.setText(f"Informe creado correctamente: {self.generated_path.name}")
         self.open_button.show()
-        self.folder_button.show()
+        self.pdf_button.show()
         show_info(self, "Informe generado", f"El documento se creo correctamente.\n\n{self.generated_path.name}", success=True)
 
     def _failed(self, message):
@@ -336,10 +432,37 @@ class WordReportWindow(QWidget):
         if self.generated_path:
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.generated_path.resolve())))
 
-    def _open_folder(self):
-        path = self.generated_path or self.excel_path
-        if path:
-            QDesktopServices.openUrl(QUrl.fromLocalFile(str(path.resolve().parent)))
+    def _generate_pdf(self):
+        if not self.generated_path or not self.generated_path.is_file():
+            show_error(self, "Genera primero el Word", "Primero crea el documento Word para poder generar el PDF.")
+            return
+        destination = self._pdf_destination()
+        if destination.exists() and not ask_confirmation(self, "El PDF ya existe", f"Ya existe {destination.name}.\n\nDeseas reemplazarlo?"):
+            return
+        self.pdf_button.setEnabled(False)
+        self.progress.show()
+        self.feedback.setText("Generando PDF a partir del documento Word...")
+        self._thread = QThread(self)
+        self._worker = WordGenerationTask(lambda: convert_word_to_pdf(self.generated_path, destination))
+        self._worker.moveToThread(self._thread)
+        self._thread.started.connect(self._worker.run)
+        self._worker.finished.connect(self._pdf_generated)
+        self._worker.failed.connect(self._pdf_failed)
+        self._worker.finished.connect(self._thread.quit)
+        self._worker.failed.connect(self._thread.quit)
+        self._worker.finished.connect(self._worker.deleteLater)
+        self._worker.failed.connect(self._worker.deleteLater)
+        self._thread.finished.connect(self._thread_finished)
+        self._thread.start()
+
+    def _pdf_generated(self, path):
+        self.generated_pdf_path = Path(path)
+        self.feedback.setText(f"PDF creado correctamente: {self.generated_pdf_path.name}")
+        show_info(self, "PDF generado", f"El PDF se guardo correctamente en la carpeta.\n\n{self.generated_pdf_path.name}", success=True)
+
+    def _pdf_failed(self, message):
+        self.feedback.setText("No fue posible crear el PDF.")
+        show_error(self, "Error al generar el PDF", message)
 
     @Slot()
     def _thread_finished(self):
@@ -350,3 +473,4 @@ class WordReportWindow(QWidget):
             thread.deleteLater()
         self.progress.hide()
         self.generate_button.setEnabled(bool(self.excel_path))
+        self.pdf_button.setEnabled(bool(self.generated_path))
