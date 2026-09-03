@@ -1,42 +1,54 @@
 # Plataforma de Informes USTA
 
-Aplicación de escritorio para transformar archivos CSV exportados desde Moodle en informes Excel institucionales. El proyecto permite administrar usuarios, configurar la información académica y ejecutar un flujo guiado de procesamiento sin depender de Microsoft Excel.
+Aplicación de escritorio para transformar archivos CSV exportados desde Moodle en informes Excel institucionales y, a partir del Excel terminado, generar el informe Word institucional con sus gráficos y su conversión a PDF. El proyecto permite administrar usuarios, configurar la información académica y ejecutar un flujo guiado de procesamiento sin depender de Microsoft Excel para el procesamiento.
 
 ## Tecnologías
 
 - Python 3.10 o superior
 - PySide6
 - Pandas y NumPy
-- OpenPyXL
-- XlsxWriter
+- OpenPyXL y XlsxWriter
+- Matplotlib, Pillow
+- python-docx, docx2pdf, pywin32 (solo Windows)
 - SQLite
 - Pytest
 
 ## Funcionalidades actuales
 
-- Inicio de sesión con contraseñas protegidas mediante `scrypt`.
+- Inicio de sesión con contraseñas protegidas mediante `scrypt` (`n=16384, r=8, p=1`).
 - Roles de administrador y usuario.
-- Administración de usuarios.
+- Administración de usuarios (crear, editar, activar/desactivar; el admin no puede eliminarse a sí mismo).
 - Administración de periodos, niveles, modalidades y programas.
 - Validación de periodos con formato `AAAA-S`, por ejemplo `2026-1`.
 - Selección y validación de archivos CSV de Moodle.
-- Detección automática de codificación y separador del CSV.
-- Procesamiento de archivos grandes por bloques.
-- Generación y previsualización del mismo libro Excel de trabajo.
+- Detección automática de codificación (`utf-8-sig`, `utf-8`, `latin-1`) y separador (`,`, `;`, tabulación, `|`).
+- Procesamiento de archivos grandes por bloques de 25.000 filas.
+- Libro Excel de trabajo único y progresivo, con previsualización del mismo archivo que se está construyendo.
 - Guardado automático del avance y recuperación de informes incompletos.
 - Reintento de pasos fallidos sin cerrar la aplicación.
+- Generación de informe Word institucional desde el Excel terminado, con tablas y gráficos Matplotlib.
+- Conversión de Word a PDF en la misma carpeta (intenta `docx2pdf`, Word por COM y LibreOffice, en ese orden).
 - Interfaz institucional con ventanas y diálogos personalizados.
 
-Actualmente se generan exclusivamente estas hojas:
+## Hojas del libro Excel
+
+El libro de trabajo (`SHEET_NAMES` en `app/services/excel_service.py`) contiene:
 
 1. `Original`
 2. `Tabla Dinamica Docentes`
+3. `Docentes DG`
+4. `Tabla Dinamica Estudiantes`
+5. `Estudiantes DG`
+6. `Estudiantes DG2`
+7. `Tabla Dinamica Actividades`
+8. `Resumen Informe`
+9. `Diseño de Cursos`
 
-Las demás hojas del informe todavía no están implementadas.
+Las hojas `DG` contienen los datos base para los gráficos. `Resumen Informe` concentra indicadores principales, actividad mensual, cursos destacados y continuidad docente para alimentar el Word.
 
 ## Tabla Dinamica Docentes
 
-La segunda hoja filtra los registros cuyo rol sea:
+Filtra los registros cuyo rol sea:
 
 ```text
 editingteacher
@@ -50,26 +62,45 @@ nunique(Dia)
 
 Los meses se generan dinámicamente con base en los datos disponibles. La columna `TOTAL` suma los valores mensuales de cada docente y al final se agrega una fila `PROMEDIO` con el promedio de cada mes.
 
-## Requisitos del CSV
+## Informe Word institucional
 
-El archivo debe tener extensión `.csv` e incluir, como mínimo, las columnas utilizadas por el procesamiento:
+El generador (`app/services/word_report_service.py:434`, `generate_word_report`) requiere un Excel terminado con estas hojas:
 
 ```text
-curso
-usuario
-rol
+Resumen Informe, Docentes DG, Tabla Dinamica Estudiantes, Diseño de Cursos
+```
+
+Lee los bloques `Indicadores principales`, `Actividad mensual`, `Cursos destacados` y `Continuidad docente`, genera gráficos de barras con Matplotlib y rellena la plantilla conservando sus estilos.
+
+La plantilla forma parte del proyecto y debe conservarse en:
+
+```text
+templates/PLANTILLA_INFORME.docx
+```
+
+No es necesario seleccionarla manualmente: la aplicación la localiza automáticamente desde esa carpeta, incluso al ejecutarse como aplicación empaquetada.
+
+La conversión a PDF (`app/services/pdf_report_service.py:52`, `convert_word_to_pdf`) guarda el PDF junto al Word. En Windows requiere Word instalado o `pip install docx2pdf pywin32`; en Linux/macOS requiere LibreOffice (`soffice`).
+
+## Requisitos del CSV
+
+El archivo debe tener extensión `.csv`. Para la validación inicial solo se exige:
+
+```text
 FechaUnix
 ```
 
-Los nombres se comparan sin distinguir mayúsculas y minúsculas. A partir de `FechaUnix`, la aplicación genera:
+Para el procesamiento completo se usan además:
 
 ```text
-Fecha
-Mes
-Dia
+curso, usuario, rol
 ```
 
-Se admiten normalmente archivos separados por coma, punto y coma, tabulación o `|`, con codificación UTF-8 o Latin-1.
+Los nombres se comparan sin distinguir mayúsculas y minúsculas y sin espacios sobrantes. A partir de `FechaUnix`, la aplicación genera:
+
+```text
+Fecha, Mes, Dia
+```
 
 ## Instalación
 
@@ -105,16 +136,6 @@ Instala las dependencias:
 pip install -r requirements.txt
 ```
 
-La plantilla institucional usada para crear los documentos Word forma parte del
-proyecto y debe conservarse en esta ruta al copiarlo o clonarlo:
-
-```text
-templates/PLANTILLA_INFORME.docx
-```
-
-No es necesario seleccionarla manualmente: la aplicación la localiza desde esa
-carpeta, independientemente del directorio desde el cual se ejecute.
-
 ## Ejecución
 
 ```bash
@@ -132,18 +153,25 @@ Se recomienda cambiar esta contraseña desde la administración de usuarios ante
 
 ## Flujo de uso
 
+### Excel
+
 1. Inicia sesión.
 2. Abre el módulo de generación de Excel.
 3. Selecciona periodo, nivel académico, modalidad y programa.
 4. Selecciona la carpeta institucional de destino.
 5. Selecciona el CSV exportado desde Moodle.
 6. Pulsa `Cargar CSV`.
-7. Ejecuta `Crear hoja Original`.
-8. Ejecuta `Convertir FechaUnix`.
-9. Ejecuta `Procesar docentes`.
-10. Previsualiza y guarda el Excel resultante.
+7. Ejecuta los pasos en orden (`Crear hoja Original`, `Convertir FechaUnix`, `Procesar docentes`, estudiantes, actividades, resumen y diseño).
+8. Previsualiza y guarda el Excel resultante.
 
 El administrador puede agregar, editar o eliminar las opciones académicas. Los usuarios normales solo pueden seleccionarlas.
+
+### Word / PDF
+
+1. Abre el módulo de informe Word.
+2. Selecciona el Excel terminado del paso anterior.
+3. Genera el Word (la plantilla se aplica sola).
+4. Convierte a PDF desde la misma ventana si lo necesitas.
 
 ## Pruebas
 
@@ -153,18 +181,24 @@ Ejecuta la suite con:
 python -m pytest -q
 ```
 
-La suite actual contiene 39 pruebas automatizadas.
+La suite actual contiene 46 pruebas automatizadas en 7 archivos (`tests/test_*.py`): autenticación, usuarios, opciones académicas, rutas institucionales, historial de procesos, servicios Excel y generación Word.
 
 ## Datos locales
 
-La base SQLite, los CSV reales y los informes generados no se suben al repositorio. Están excluidos mediante `.gitignore` para evitar publicar datos institucionales o personales.
+La base SQLite, los CSV reales, los informes generados y las carpetas de depuración no se suben al repositorio. Están excluidos mediante `.gitignore` para evitar publicar datos institucionales o personales.
 
 Rutas locales principales:
 
 ```text
 data/app.db
 data/*.csv
+data/*.xlsx
 reports/*.xlsx
+reports/*.docx
+reports/*.pdf
+debug_output/
+debug_output2/
+*.db
 ```
 
 ## Estructura del proyecto
@@ -173,12 +207,12 @@ reports/*.xlsx
 app/
 ├── database/    # Conexión e inicialización de SQLite
 ├── models/      # Conversión de entidades
-├── services/    # Autenticación y procesamiento CSV/Excel
-└── ui/          # Ventanas, diálogos, temas y recursos visuales
+├── services/    # auth, csv, excel, chart, word, pdf, historial, opciones y rutas
+└── ui/          # login, dashboard, proceso Excel, informe Word, usuarios, temas
+templates/        # PLANTILLA_INFORME.docx institucional
 tests/            # Pruebas automatizadas
+data/             # Base local y CSV reales (no versionado)
+reports/          # Informes generados (no versionado)
 main.py           # Punto de entrada
 ```
 
-## Estado del proyecto
-
-Proyecto académico en desarrollo para la automatización de informes de uso de Moodle de la Universidad Santo Tomás.
