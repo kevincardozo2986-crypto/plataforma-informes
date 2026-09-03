@@ -216,3 +216,6 @@ reports/          # Informes generados (no versionado)
 main.py           # Punto de entrada
 ```
 
+## Estado del proyecto
+
+Proyecto académico en desarrollo para la automatización de informes de uso de Moodle de la Universidad Santo Tomás. Genera el libro Excel completo, el Word institucional y su PDF.

@@ -7,5 +7,6 @@ matplotlib
 Pillow
 python-docx
 docx2pdf
+# Solo Windows (Word por COM). En Mac/Linux se omite automáticamente.
 pywin32; sys_platform == "win32"
 pytest
