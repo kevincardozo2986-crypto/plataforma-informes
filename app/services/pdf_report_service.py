@@ -5,16 +5,48 @@ Multiplataforma:
 - macOS: usa Word instalado vía docx2pdf, o LibreOffice (brew install --cask libreoffice).
 """
 
+import os
 import platform
 import shutil
 import subprocess
+import time
+import unicodedata
 from pathlib import Path
+
+
+def _normalize_fs_path(path):
+    """Normaliza una ruta para los conversores externos (Word/LibreOffice).
+
+    En macOS el sistema de archivos guarda los tildes descompuestos (NFD)
+    mientras Python suele usar compuestos (NFC); esa diferencia rompe la
+    automatización de Word por AppleScript con "Mensaje incomprensible".
+    Se prueba NFC primero y NFD como alternativa.
+    """
+    text = os.fspath(path)
+    for form in ("NFC", "NFD"):
+        candidate = Path(unicodedata.normalize(form, text))
+        if candidate.exists():
+            return candidate
+    return Path(unicodedata.normalize("NFC", text))
 
 
 def _convert_with_docx2pdf(word_path, pdf_path):
     from docx2pdf import convert
 
-    convert(str(word_path), str(pdf_path))
+    word_path = _normalize_fs_path(word_path)
+    if not word_path.is_file():
+        raise FileNotFoundError(f"Word no encuentra el archivo: {word_path}")
+    attempts = 2 if platform.system() == "Darwin" else 1
+    last_error = None
+    for attempt in range(attempts):
+        try:
+            convert(str(word_path), str(pdf_path))
+            return
+        except Exception as error:
+            last_error = error
+            if attempt + 1 < attempts:
+                time.sleep(3)
+    raise last_error
 
 
 def _convert_with_win32com(word_path, pdf_path):
@@ -100,7 +132,12 @@ def convert_word_to_pdf(word_path, pdf_path=None):
     if platform.system() == "Windows":
         hint = "Instala Word o LibreOffice y ejecuta: pip install docx2pdf pywin32"
     elif platform.system() == "Darwin":
-        hint = "Instala Word para Mac o ejecuta: brew install --cask libreoffice; pip install docx2pdf"
+        hint = (
+            "En Mac con Word: ciérralo (sin diálogos abiertos), permite la "
+            "automatización en Ajustes del Sistema > Privacidad y seguridad > "
+            "Automatización, y reintenta. Alternativa: brew install --cask "
+            "libreoffice; pip install docx2pdf"
+        )
     else:
         hint = "Instala LibreOffice (soffice) y ejecuta: pip install docx2pdf"
     raise RuntimeError(
