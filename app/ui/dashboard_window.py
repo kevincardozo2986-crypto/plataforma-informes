@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.ui.theme import DASHBOARD_STYLESHEET
+from app.ui.assistant import anchor_bottom_right
 from app.ui.modal_dialogs import MODAL_STYLE, exec_modal
 from app.ui.window_chrome import preparar_ventana_sin_marco
 from app.ui.excel_process_window import ExcelProcessWindow
@@ -206,6 +207,7 @@ class DashboardWindow(QMainWindow):
         diseno_ventana.addWidget(self.stack, 1)
         self.setCentralWidget(contenedor)
         self.setStyleSheet(DASHBOARD_STYLESHEET)
+        anchor_bottom_right(self.home_page, "inicio")
 
     def _create_home_page(self):
         page = named(QWidget(), "dashboardPage")

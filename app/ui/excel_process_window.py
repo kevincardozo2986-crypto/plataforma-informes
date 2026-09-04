@@ -37,6 +37,7 @@ from app.ui.modal_dialogs import (
     show_warning,
 )
 from app.ui.theme import EXCEL_MODULE_STYLESHEET
+from app.ui.assistant import anchor_bottom_right
 from app.ui.window_chrome import preparar_ventana_sin_marco
 
 
@@ -273,6 +274,7 @@ class ExcelProcessWindow(QWidget):
         self._configuration_locked = False
         self.setStyleSheet(EXCEL_MODULE_STYLESHEET)
         self._build_ui()
+        anchor_bottom_right(self, "excel")
 
     def preparar_nuevo_informe(self):
         """Limpia un informe terminado antes de comenzar otro flujo."""

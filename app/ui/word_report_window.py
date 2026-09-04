@@ -16,6 +16,7 @@ from app.services.report_path_service import build_pdf_path, build_word_path
 from app.services.pdf_report_service import convert_word_to_pdf
 from app.services.process_history_service import list_completed_processes
 from app.services.word_report_service import generate_word_report
+from app.ui.assistant import anchor_bottom_right
 from app.ui.modal_dialogs import ask_confirmation, show_error, show_info
 from app.ui.theme import EXCEL_MODULE_STYLESHEET
 
@@ -94,6 +95,7 @@ class WordReportWindow(QWidget):
         self._thread = None
         self._worker = None
         self._build_ui()
+        anchor_bottom_right(self, "word")
 
     def _build_ui(self):
         root = QVBoxLayout(self)

@@ -24,6 +24,7 @@ from app.services.user_service import (
     update_user,
 )
 from app.ui.user_form_widget import UserFormWidget
+from app.ui.assistant import anchor_bottom_right
 from app.ui.modal_dialogs import ask_confirmation, show_error, show_warning
 from app.ui.theme import USERS_STYLESHEET
 
@@ -66,6 +67,7 @@ class UsersPage(QWidget):
         self.setMinimumSize(1050, 680)
         self._build_ui()
         self.setStyleSheet(USERS_STYLESHEET)
+        anchor_bottom_right(self, "usuarios")
         self._load_users()
 
     def _build_ui(self):
