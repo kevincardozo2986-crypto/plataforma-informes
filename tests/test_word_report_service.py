@@ -89,7 +89,9 @@ def test_generates_word_from_finished_excel_and_preserves_template(tmp_path):
     assert "Tabla de ilustraciones" in paragraphs
     assert "Tabla de contenido" in paragraphs
     assert "PAGEREF" not in field_codes
-    assert "La tabla de contenido se actualizará al abrir el documento." in paragraphs
+    toc_cache = next(p for p in paragraphs if "Resumen Ejecutivo" in p and "1. Introducción" in p)
+    assert "7. Diseño de cursos virtuales" in toc_cache
+    assert "TOC \\h \\z \\u" in field_codes
     assert "1. Introducción" in paragraphs
     assert "7. Diseño de cursos virtuales" in paragraphs
 

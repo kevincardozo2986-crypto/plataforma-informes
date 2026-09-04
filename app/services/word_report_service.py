@@ -431,6 +431,126 @@ def _configure_illustrations_field(document):
             node.text = ' TOC \\h \\z \\c "FiguraInforme" '
 
 
+SECTION_TITLES = (
+    "Resumen Ejecutivo",
+    "1. Introducción",
+    "2. Metodología de los indicadores",
+    "3. Comportamiento mensual de la actividad",
+    "4. Docentes",
+    "5. Estudiantes",
+    "6. Cursos destacados",
+    "7. Diseño de cursos virtuales",
+)
+
+
+def _set_field_cache_lines(field_paragraph_element, lines):
+    """Inserta un caché estático entre separate/end para LibreOffice.
+
+    Word regenera el campo al abrir (begin dirty); LibreOffice muestra
+    este caché en el PDF porque no ejecuta campos TOC/SEQ de Word.
+    """
+    runs = list(field_paragraph_element.findall(qn("w:r")))
+    sep_idx = end_idx = None
+    for i, run in enumerate(runs):
+        types = {c.get(qn("w:fldCharType")) for c in run.iter(qn("w:fldChar"))}
+        if "separate" in types and sep_idx is None:
+            sep_idx = i
+        if "end" in types:
+            end_idx = i
+    if sep_idx is None or end_idx is None or end_idx <= sep_idx + 1:
+        # Sin caché previo con formato esperado; si solo hay placeholder,
+        # sep_idx+1 == end_idx-? lo reconstruimos igual si hay hueco.
+        if sep_idx is None or end_idx is None:
+            return False
+    for run in runs[sep_idx + 1:end_idx]:
+        field_paragraph_element.remove(run)
+    anchor = runs[sep_idx]
+    for li, line in enumerate(lines):
+        cache_run = OxmlElement("w:r")
+        text_node = OxmlElement("w:t")
+        text_node.set(qn("xml:space"), "preserve")
+        text_node.text = line
+        cache_run.append(text_node)
+        anchor.addnext(cache_run)
+        anchor = cache_run
+        if li < len(lines) - 1:
+            br_run = OxmlElement("w:r")
+            br = OxmlElement("w:br")
+            br_run.append(br)
+            anchor.addnext(br_run)
+            anchor = br_run
+    return True
+
+
+def _field_paragraph(document, predicate):
+    for paragraph in document.element.iter(qn("w:p")):
+        for node in paragraph.iter(qn("w:instrText")):
+            if predicate(node.text or ""):
+                return paragraph
+    return None
+
+
+def _ensure_toc_cache(document):
+    field_p = _field_paragraph(
+        document,
+        lambda t: "TOC" in t and "FiguraInforme" not in t
+        and "PAGEREF" not in t and "SEQ" not in t,
+    )
+    if field_p is None:
+        return False
+    return _set_field_cache_lines(field_p, list(SECTION_TITLES))
+
+
+def _ensure_illustrations_cache(document, figure_captions):
+    field_p = _field_paragraph(
+        document,
+        lambda t: "TOC" in t and "FiguraInforme" in t,
+    )
+    if field_p is None:
+        return False
+    lines = [f"Ilustración {i} {caption}" for i, caption in enumerate(figure_captions, 1)]
+    return _set_field_cache_lines(field_p, lines)
+
+
+def _fix_cover_overflow(document, program=""):
+    """Evita que la portada recorte el último nombre en Mac/LibreOffice.
+
+    La caja usa <a:noAutofit/> con altura fija (140.9pt) y texto vertical
+    btLr a 14pt. Con otra métrica de fuente (Mac) el programa largo hace
+    wrap y expulsa la última línea. Se activa auto-ajuste, se amplía el
+    fallback VML y se reduce la fuente si el programa es largo.
+    """
+    ns_a = "http://schemas.openxmlformats.org/drawingml/2006/main"
+    fixed = 0
+    for no_autofit in list(document.element.iter(f"{{{ns_a}}}noAutofit")):
+        parent = no_autofit.getparent()
+        if parent is None:
+            continue
+        idx = list(parent).index(no_autofit)
+        replacement = OxmlElement("a:spAutoFit")
+        parent.remove(no_autofit)
+        parent.insert(idx, replacement)
+        fixed += 1
+    for rect in document.element.iter("{urn:schemas-microsoft-com:vml}rect"):
+        style = rect.get("style") or ""
+        if "height:140.9pt" in style:
+            rect.set("style", style.replace("height:140.9pt", "height:168pt"))
+            fixed += 1
+    if program and len(program.strip()) > 24:
+        for node in document.element.iter(qn("w:t")):
+            if (node.text or "").strip().casefold() == program.strip().casefold():
+                run = node.getparent()
+                rpr = run.find(qn("w:rPr")) if run is not None else None
+                if rpr is not None:
+                    for sz in rpr.iter(qn("w:sz")):
+                        try:
+                            if int(sz.get(qn("w:val"), "28")) > 24:
+                                sz.set(qn("w:val"), "24")
+                        except ValueError:
+                            pass
+    return fixed
+
+
 def _build_auto_field_paragraph(instruction, placeholder):
     """Crea un párrafo con un campo auto-actualizable (begin dirty, separate, end)."""
     paragraph_element = OxmlElement("w:p")
@@ -566,8 +686,10 @@ def generate_word_report(workbook_path, output_path, program, period, template_p
         document = Document(template_path)
         _replace_images(document, images)
         _replace_cover_fields(document, program, period)
+        _fix_cover_overflow(document, program)
         _configure_toc_field(document)
         _configure_illustrations_field(document)
+        _ensure_toc_cache(document)
 
         indicator_rows = []
         for label, result, reading in data["indicators"]:
@@ -706,6 +828,7 @@ def generate_word_report(workbook_path, output_path, program, period, template_p
         for index, caption in enumerate(figure_captions, 1):
             _set_figure_caption(document, index, caption)
         _style_figure_captions(document)
+        _ensure_illustrations_cache(document, figure_captions)
         for paragraph in document.paragraphs:
             if "2026-1" in paragraph.text and period != "2026-1":
                 paragraph.text = paragraph.text.replace("2026-1", period)
