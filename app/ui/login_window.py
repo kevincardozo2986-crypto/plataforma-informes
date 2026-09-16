@@ -78,7 +78,7 @@ class LoginWindow(QWidget):
         diseno_exterior.setSpacing(0)
         diseno_exterior.addWidget(
             preparar_ventana_sin_marco(
-                self, "Plataforma de Informes USTA", controles_completos=True
+                self, "Plataforma de Informes Santoto Tunja", controles_completos=True
             )
         )
         contenido = QWidget()

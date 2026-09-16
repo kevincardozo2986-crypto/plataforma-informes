@@ -112,7 +112,7 @@ class WordReportWindow(QWidget):
         back.clicked.connect(self.back_requested.emit)
         navigation.addWidget(back)
         navigation.addStretch()
-        navigation.addWidget(QLabel("PLATAFORMA DE INFORMES  ·  USTA", objectName="wordMuted"))
+        navigation.addWidget(QLabel("PLATAFORMA DE INFORMES  ·  Santoto Tunja", objectName="wordMuted"))
         root.addLayout(navigation)
 
         hero = QFrame(objectName="wordHero")

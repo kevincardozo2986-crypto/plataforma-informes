@@ -242,7 +242,7 @@ def _create_charts(directory, data, program, period):
     _line_chart(paths[0], categories, [
         ("Estudiantes", [row[1] or 0 for row in monthly], BLUE),
         ("Docentes", [row[3] or 0 for row in monthly], GOLD),
-    ], "Eventos mensuales por tipo de usuario", "Eventos registrados")
+    ], "Acciones de estudiantes y docentes por mes", "Acciones registradas")
     teacher = data["teacher_chart"]
     _line_chart(paths[1], [MONTH_NAMES.get(row[0].upper(), row[0]) for row in teacher],
                 [("PROMEDIO", [row[1] for row in teacher], BLUE)],
@@ -258,7 +258,7 @@ def _create_charts(directory, data, program, period):
                 [("Promedio de estudiantes", [row[1] for row in users], GOLD)],
                 "Promedio de estudiantes que usaron el Campus Virtual de la facultad\n"
                 f"de {program} {period}", "Promedio de estudiantes")
-    _bar_chart(paths[4], data["courses"], "Cursos con mayor continuidad estudiantil")
+    _bar_chart(paths[4], data["courses"], "Cursos con más días de actividad estudiantil")
     _pie_chart(paths[5], data["design"], "Diseño de Cursos")
     return paths
 
@@ -432,10 +432,10 @@ def _configure_illustrations_field(document):
 
 
 SECTION_TITLES = (
-    "Resumen Ejecutivo",
+    "Resumen del informe",
     "1. Introducción",
-    "2. Metodología de los indicadores",
-    "3. Comportamiento mensual de la actividad",
+    "2. Cómo leer los resultados",
+    "3. Uso de la plataforma por mes",
     "4. Docentes",
     "5. Estudiantes",
     "6. Cursos destacados",
@@ -695,42 +695,59 @@ def generate_word_report(workbook_path, output_path, program, period, template_p
         for label, result, reading in data["indicators"]:
             decimals = 1 if isinstance(result, float) and not result.is_integer() else 0
             suffix = " promedio" if str(label).startswith("D\u00edas activos") else (
-                " eventos" if str(label).startswith("Actividad") else ""
+                " acciones" if str(label).startswith("Actividad") else ""
             )
-            indicator_rows.append((label, _number(result, decimals) + suffix, reading))
+            plain_labels = {
+                "Eventos totales": "Total de acciones registradas",
+                "Usuarios únicos": "Personas que usaron la plataforma (sin repetir)",
+                "Actividad estudiantil": "Acciones de estudiantes",
+                "Actividad docente": "Acciones de docentes",
+                "Días activos por estudiante": "Días con actividad por estudiante",
+                "Días activos por docente": "Días con actividad por docente",
+            }
+            plain_readings = {
+                "Interacciones registradas": "Acciones que quedaron guardadas en la plataforma.",
+                "Eventos de estudiantes": "Acciones realizadas por estudiantes.",
+                "Eventos de docentes": "Acciones realizadas por docentes.",
+            }
+            reading = plain_readings.get(str(reading), reading)
+            if str(reading).startswith("Mediana:"):
+                reading = str(reading).replace("Mediana:", "Valor central al ordenar los días de uso de menor a mayor:", 1)
+            indicator_rows.append((plain_labels.get(str(label), label), _number(result, decimals) + suffix, reading))
         monthly_rows = [
             (MONTH_NAMES.get(str(row[0]).upper(), row[0]), _number(row[1]), _number(row[2]), _number(row[3]))
             for row in data["monthly"]
         ]
         teacher_rows = [(row[0], row[1], _number(row[2])) for row in data["teachers"]]
         course_rows = [(row[0], _number(row[1]), _number(row[2]), _number(row[3])) for row in data["courses"]]
-        _fill_table(document.tables[0], ("Indicador", "Resultado", "Lectura"), indicator_rows)
-        _fill_table(document.tables[2], ("Mes", "Eventos estudiantes", "Estudiantes activos", "Eventos docentes"), monthly_rows)
-        _fill_table(document.tables[3], ("Curso", "Docente", "D\u00edas activos"), teacher_rows)
-        _fill_table(document.tables[4], ("Curso", "Eventos", "Estudiantes \u00fanicos", "D\u00edas activos"), course_rows)
+        _fill_table(document.tables[0], ("Dato", "Resultado", "Qué significa"), indicator_rows)
+        _fill_table(document.tables[2], ("Mes", "Acciones de estudiantes", "Estudiantes con actividad", "Acciones de docentes"), monthly_rows)
+        _fill_table(document.tables[3], ("Curso", "Docente", "Días con actividad"), teacher_rows)
+        _fill_table(document.tables[4], ("Curso", "Acciones registradas", "Estudiantes sin repetir", "Días con actividad"), course_rows)
 
         _replace_paragraph(document, "Durante el semestre", (
-            f"Durante el periodo {period} se analizaron {_number(total_events)} eventos de Open LMS "
-            f"correspondientes al programa de {program}. Los resultados permiten reconocer el nivel de "
-            "participacion de estudiantes y docentes, la continuidad mensual y los cursos con mayor actividad."
+            f"Durante el periodo {period} se revisaron {_number(total_events)} acciones registradas en el Campus Virtual "
+            f"del programa de {program}. Los resultados muestran la participación de estudiantes y docentes, "
+            "el uso por mes y los cursos con más actividad. Una acción no equivale necesariamente a un ingreso "
+            "ni indica cuánto tiempo estuvo conectada una persona."
         ))
         _replace_paragraph(document, "Este informe", (
-            f"Este informe estad\u00edstico presenta el uso de la plataforma Open LMS para el programa de "
+            f"Este informe presenta el uso del Campus Virtual en el programa de "
             f"{program} durante el periodo {period}. Fue elaborado por el equipo del Campus Virtual."
         ))
         _replace_paragraph(document, "Para la", (
             f"Para la elaboraci\u00f3n del informe se analizaron {_number(total_events)} registros del sistema "
-            "de seguimiento del Campus Virtual. La informaci\u00f3n fue consolidada autom\u00e1ticamente en Excel."
+            "del Campus Virtual. Estos datos se reunieron en Excel para preparar las tablas y las gráficas."
         ))
         sheet_descriptions = {
-            "Original": "Datos originales y campos de fecha preparados.",
-            "Tabla Dinamica Docentes": "Actividad docente consolidada por curso y mes.",
-            "Docentes DG": "Representación gráfica de la actividad docente mensual.",
-            "Tabla Dinamica Estudiantes": "Días activos y estudiantes únicos por curso y mes.",
-            "Estudiantes DG": "Representación gráfica de los días de actividad estudiantil.",
+            "Original": "Registros de la plataforma con sus fechas.",
+            "Tabla Dinamica Docentes": "Resumen del uso de la plataforma por los docentes, por curso y mes.",
+            "Docentes DG": "Gráfica del uso de la plataforma por los docentes cada mes.",
+            "Tabla Dinamica Estudiantes": "Días con actividad y cantidad de estudiantes, sin repetirlos dentro de cada curso y mes.",
+            "Estudiantes DG": "Gráfica de los días en que hubo actividad de estudiantes.",
             "Estudiantes DG2": "Promedio mensual de estudiantes que usaron el Campus Virtual.",
             "Tabla Dinamica Actividades": "Cantidad de acciones registradas en cada curso.",
-            "Resumen Informe": "Indicadores y datos consolidados para el informe institucional.",
+            "Resumen Informe": "Resumen de las cifras que se presentan en este informe.",
             "Diseño de Cursos": "Cantidad de cursos con contenido y sin contenido.",
         }
         sheet_lines = [
@@ -753,21 +770,21 @@ def generate_word_report(workbook_path, output_path, program, period, template_p
             peak = max(data["monthly"], key=lambda row: (row[1] or 0) + (row[3] or 0))
             monthly_text = (
                 f"La mayor actividad se registr\u00f3 en {MONTH_NAMES.get(str(peak[0]).upper(), peak[0])}, "
-                f"con {_number((peak[1] or 0) + (peak[3] or 0))} eventos combinados. La tabla compara "
-                "el volumen de eventos con la cantidad de estudiantes activos por mes."
+                f"con {_number((peak[1] or 0) + (peak[3] or 0))} acciones de estudiantes y docentes en total. La tabla muestra "
+                "cuántas acciones se registraron y cuántos estudiantes usaron la plataforma cada mes."
             )
             if not _replace_marker(document, "{{ANALISIS_MENSUAL}}", monthly_text):
                 _replace_paragraph(document, "La actividad se concentr\u00f3", monthly_text)
         if teacher_rows:
             teacher_details = [
-                f"{row[1]} en {row[0]}, con {row[2]} días activos durante el periodo."
+                f"{row[1]} en {row[0]}, con {row[2]} días con actividad durante el periodo."
                 for row in teacher_rows[:3]
             ]
             teacher_details.extend([""] * (3 - len(teacher_details)))
             teacher_intro = (
-                f"Los docentes con mayor continuidad se identificaron mediante los d\u00edas diferentes con "
-                f"actividad. El primer lugar corresponde a {teacher_rows[0][1]} en {teacher_rows[0][0]}, "
-                f"con {teacher_rows[0][2]} d\u00edas activos."
+                f"Los docentes se ordenaron según la cantidad de días con actividad en cada curso. "
+                f"La mayor cantidad corresponde a {teacher_rows[0][1]} en {teacher_rows[0][0]}, "
+                f"con {teacher_rows[0][2]} días con actividad."
             )
             if _replace_marker(document, "{{ANALISIS_DOCENTES}}", teacher_intro):
                 for index, detail in enumerate(teacher_details, 1):
@@ -776,14 +793,14 @@ def generate_word_report(workbook_path, output_path, program, period, template_p
                 _replace_paragraph_group(document, "Con un uso que va", [teacher_intro, *teacher_details])
         if course_rows:
             course_details = [
-                f"{row[0]}: {row[1]} eventos, {row[2]} estudiantes únicos y {row[3]} días activos."
+                f"{row[0]}: {row[1]} acciones, {row[2]} estudiantes sin repetir y {row[3]} días con actividad."
                 for row in course_rows[:3]
             ]
             course_details.extend([""] * (3 - len(course_details)))
             course_intro = (
-                f"El curso con mayor continuidad estudiantil fue {course_rows[0][0]}, con "
-                f"{course_rows[0][3]} d\u00edas activos, {course_rows[0][1]} eventos y "
-                f"{course_rows[0][2]} estudiantes \u00fanicos."
+                f"El curso con más días de actividad de estudiantes fue {course_rows[0][0]}, con "
+                f"{course_rows[0][3]} días con actividad, {course_rows[0][1]} acciones y "
+                f"{course_rows[0][2]} estudiantes sin repetir."
             )
             if _replace_marker(document, "{{ANALISIS_ESTUDIANTES}}", course_intro):
                 for index, detail in enumerate(course_details, 1):
@@ -800,14 +817,14 @@ def generate_word_report(workbook_path, output_path, program, period, template_p
         if not _replace_marker(document, "{{ANALISIS_DISENO}}", design_text):
             _replace_containing(document, "cuenta con un total de 59 cursos", design_text)
         chart_titles = (
-            "Eventos mensuales por tipo de usuario",
+            "Acciones de estudiantes y docentes por mes",
             "Días al mes de uso del Campus Virtual por parte de los docentes "
             f"de la facultad de {program} {period}",
             "Días del mes de uso del Campus Virtual por parte de los estudiantes "
             f"de la facultad de {program} {period}",
             "Promedio de estudiantes que usaron el Campus Virtual de la facultad "
             f"de {program} {period}",
-            "Cursos con mayor continuidad estudiantil",
+            "Cursos con más días de actividad estudiantil",
             "Diseño de Cursos",
         )
         for index, title in enumerate(chart_titles, 1):
@@ -818,11 +835,11 @@ def generate_word_report(workbook_path, output_path, program, period, template_p
                     f"Ilustración {index}. {title}.",
                 )
         figure_captions = (
-            f"Eventos mensuales por tipo de usuario {period}",
+            f"Acciones de estudiantes y docentes por mes {period}",
             f"Días al mes de uso de la plataforma Open LMS - Docentes {period}",
             f"Días al mes de uso de la plataforma Open LMS - Estudiantes {period}",
             f"Promedio de uso de la plataforma Open LMS - Estudiantes {period}",
-            f"Cursos con mayor continuidad estudiantil {period}",
+            f"Cursos con más días de actividad estudiantil {period}",
             f"Porcentaje de cursos con contenido {period}",
         )
         for index, caption in enumerate(figure_captions, 1):

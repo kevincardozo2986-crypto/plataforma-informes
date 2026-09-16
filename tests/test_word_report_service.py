@@ -60,7 +60,7 @@ def test_generates_word_from_finished_excel_and_preserves_template(tmp_path):
     assert "400.568" not in report_text
     assert "59 cursos" not in report_text
     assert "Días al mes de uso de la plataforma Open LMS - Docentes" in report_text
-    assert "Cursos con mayor continuidad estudiantil" in report_text
+    assert "Cursos con más días de actividad estudiantil" in report_text
     assert "Administracion de Empresas" in xml_text
     assert "2027-2" in xml_text
     assert "10 hojas" not in report_text
@@ -89,7 +89,7 @@ def test_generates_word_from_finished_excel_and_preserves_template(tmp_path):
     assert "Tabla de ilustraciones" in paragraphs
     assert "Tabla de contenido" in paragraphs
     assert "PAGEREF" not in field_codes
-    toc_cache = next(p for p in paragraphs if "Resumen Ejecutivo" in p and "1. Introducción" in p)
+    toc_cache = next(p for p in paragraphs if "Resumen del informe" in p and "1. Introducción" in p)
     assert "7. Diseño de cursos virtuales" in toc_cache
     assert "TOC \\h \\z \\u" in field_codes
     assert "1. Introducción" in paragraphs

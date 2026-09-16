@@ -9,7 +9,6 @@ from app.models.user import user_to_dict
 
 # Credenciales que se usan solamente para crear el primer administrador.
 DEFAULT_ADMIN_USERNAME = "admin"
-DEFAULT_ADMIN_PASSWORD = "Admin123"
 DEFAULT_ADMIN_FULL_NAME = "Administrador"
 
 
@@ -141,15 +140,19 @@ def authenticate_user(username, password):
     return user_to_dict(database_row)
 
 
-def initialize_auth():
-    """Crea la base y el administrador inicial si todavía no existen."""
+def initialize_auth(initial_password=None):
+    """Inicializa las cuentas; devuelve False si falta configurar el primer admin."""
     initialize_database()
-    admin = get_user_by_username(DEFAULT_ADMIN_USERNAME)
-
-    if admin is None:
-        create_user(
-            DEFAULT_ADMIN_USERNAME,
-            DEFAULT_ADMIN_PASSWORD,
-            DEFAULT_ADMIN_FULL_NAME,
-            role="admin",
-        )
+    with get_connection() as connection:
+        if connection.execute("SELECT 1 FROM users LIMIT 1").fetchone():
+            return True
+    password = initial_password or os.environ.get("SANTOTO_ADMIN_PASSWORD")
+    if not password:
+        return False
+    create_user(
+        os.environ.get("SANTOTO_ADMIN_USERNAME", DEFAULT_ADMIN_USERNAME),
+        password,
+        DEFAULT_ADMIN_FULL_NAME,
+        role="admin",
+    )
+    return True

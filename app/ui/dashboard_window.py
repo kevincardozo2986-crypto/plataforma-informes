@@ -2,7 +2,7 @@ from pathlib import Path
 from shutil import copyfile
 
 from PySide6.QtCore import QSize, Qt, QUrl, Signal
-from PySide6.QtGui import QColor, QDesktopServices, QIcon, QPixmap
+from PySide6.QtGui import QColor, QDesktopServices, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -221,7 +221,7 @@ class DashboardWindow(QMainWindow):
         diseno_ventana.setSpacing(0)
         diseno_ventana.addWidget(
             preparar_ventana_sin_marco(
-                self, "Plataforma de Informes USTA", controles_completos=True,
+                self, "Plataforma de Informes Santoto Tunja", controles_completos=True,
                 mostrar_logo=True,
             )
         )
@@ -248,7 +248,14 @@ class DashboardWindow(QMainWindow):
     def _nav(self, text, icon_name="document.svg", active=False):
         button = QPushButton(f"  {text}")
         button.setObjectName("activeNavButton" if active else "navButton")
-        button.setIcon(QIcon(str(ASSETS / icon_name)))
+        icon = QPixmap(str(ASSETS / icon_name)).scaled(20, 20, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        if not icon.isNull():
+            painter = QPainter(icon)
+            painter.setCompositionMode(QPainter.CompositionMode_SourceIn)
+            painter.fillRect(icon.rect(), QColor("#FFFFFF" if active else "#C4D8F0"))
+            painter.end()
+        button.setIcon(QIcon(icon))
+        button.setIconSize(QSize(20, 20))
         button.setCursor(Qt.PointingHandCursor)
         button.setMinimumHeight(42)
         return button
@@ -258,44 +265,50 @@ class DashboardWindow(QMainWindow):
         sidebar.setFixedWidth(220)
         layout = QVBoxLayout(sidebar)
         layout.setContentsMargins(20, 22, 20, 22)
-        layout.setSpacing(7)
+        layout.setSpacing(5)
         crest = QLabel()
         crest.setPixmap(QPixmap(str(ASSETS / 'usta-crest.png')).scaled(66, 66, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         crest.setAlignment(Qt.AlignCenter)
         layout.addWidget(crest)
-        sidebar_title = named(QLabel("UNIVERSIDAD\nSANTO TOMÁS"), "sidebarTitle")
+        sidebar_title = named(QLabel("SANTOTO TUNJA"), "sidebarTitle")
         sidebar_title.setWordWrap(True)
         sidebar_title.setAlignment(Qt.AlignCenter)
-        sidebar_title.setStyleSheet('font-family: Georgia; font-size: 19px; color: white;')
+        sidebar_title.setStyleSheet('font-size: 17px; font-weight: 700; color: white;')
         layout.addWidget(sidebar_title)
-        sidebar_subtitle = named(QLabel("Vigilada Mineducación"), "sidebarSubtitle")
+        sidebar_subtitle = named(QLabel("Plataforma de informes"), "sidebarSubtitle")
         sidebar_subtitle.setAlignment(Qt.AlignCenter)
         sidebar_subtitle.setWordWrap(True)
         layout.addWidget(sidebar_subtitle)
-        layout.addSpacing(22)
+        layout.addSpacing(16)
+        layout.addWidget(named(QLabel("MI TRABAJO"), "navSectionLabel"))
         nav = [
-            ("Procesos", "history.svg", self._show_dashboard, True),
-            ("Informes", "document.svg", self._open_reports, False),
+            ("Inicio", "home.svg", self._show_dashboard, True),
+            ("Preparar Excel", "excel.svg", self.excel_requested.emit, False),
+            ("Crear Word y PDF", "document.svg", self._open_report_creation, False),
             ("Historial", "history.svg", self._open_history, False),
-            ("Plantillas", "excel.svg", self.excel_requested.emit, False),
-            ("Configuración", "edit.svg", self._open_configuration, False),
-            ("Ayuda", "users.svg", self._open_help, False),
-            ("Manual de usuario", "document.svg", self._download_user_manual, False),
         ]
         for text, icon, callback, active in nav:
             button = self._nav(text, icon, active)
             if callback:
                 button.clicked.connect(callback)
             layout.addWidget(button)
+        layout.addSpacing(12)
+        layout.addWidget(named(QLabel("AYUDA Y CONSULTA"), "navSectionLabel"))
+        guide = self._nav("Guía de inicio", "help.svg")
+        guide.setToolTip("Ver los pasos para preparar Excel y crear informes")
+        guide.clicked.connect(self._open_help)
+        layout.addWidget(guide)
+        manual = self._nav("Descargar manual", "download.svg")
+        manual.setToolTip("Guardar el manual de usuario en PDF")
+        manual.clicked.connect(self._download_user_manual)
+        layout.addWidget(manual)
         if self.user["role"] == "admin":
+            layout.addSpacing(12)
+            layout.addWidget(named(QLabel("ADMINISTRACIÓN"), "navSectionLabel"))
             users = self._nav("Gestionar usuarios", "users.svg")
             users.clicked.connect(self._open_users)
             layout.addWidget(users)
         layout.addStretch()
-        motto = QLabel('Aquí se construye\ntu propósito.')
-        motto.setWordWrap(True)
-        motto.setStyleSheet('color: #DCEBFF; font-size: 20px; font-style: italic; padding: 10px 0px;')
-        layout.addWidget(motto)
         logout = self._nav("Cerrar sesión", "logout.svg")
         logout.setObjectName("logoutNavButton")
         logout.clicked.connect(self.logout_requested.emit)
@@ -316,19 +329,18 @@ class DashboardWindow(QMainWindow):
         breadcrumb = QHBoxLayout()
         breadcrumb.setSpacing(8)
         breadcrumb.setContentsMargins(0, 0, 0, 0)
-        home_icon = named(QLabel("⌂"), "breadcrumbHome")
+        home_icon = named(QLabel(), "breadcrumbHome")
+        home_icon.setPixmap(QPixmap(str(ASSETS / "home.svg")).scaled(16, 16, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         home_icon.setAlignment(Qt.AlignVCenter)
         link_inicio = named(QLabel("Inicio"), "breadcrumbLink")
-        sep = named(QLabel("/"), "breadcrumbSeparator")
-        active = named(QLabel("Procesos"), "breadcrumbActive")
-        for w in (home_icon, link_inicio, sep, active):
+        for w in (home_icon, link_inicio):
             breadcrumb.addWidget(w, alignment=Qt.AlignVCenter)
         breadcrumb.addStretch()
         breadcrumb_widget = QWidget()
         breadcrumb_widget.setObjectName("breadcrumbWidget")
         breadcrumb_widget.setLayout(breadcrumb)
         brand_heading = QVBoxLayout()
-        brand_title = QLabel('Plataforma de Informes USTA')
+        brand_title = QLabel('Plataforma de Informes Santoto Tunja')
         brand_title.setStyleSheet('font-size: 21px; font-weight: 700; color: #082551;')
         brand_heading.addWidget(brand_title)
         brand_heading.addWidget(named(QLabel('Transforma datos en decisiones claras.'), 'routeSubtitle'))
@@ -396,7 +408,7 @@ class DashboardWindow(QMainWindow):
         scroll.setMinimumHeight(440)
         layout.addWidget(scroll, 1)
         layout.addSpacing(6)
-        footer = named(QLabel("Plataforma de Informes USTA   •   Versión 1.0"), "dashboardFooter")
+        footer = named(QLabel("Plataforma de Informes Santoto Tunja   •   Versión 1.0  •   Kevin Cardozo  " ), "dashboardFooter")
         footer.setAlignment(Qt.AlignCenter)
         layout.addWidget(footer)
         return content
@@ -537,54 +549,6 @@ class DashboardWindow(QMainWindow):
         layout.addLayout(content, 1)
         exec_modal(dialog)
 
-    def _open_configuration(self):
-        dialog = QDialog(self)
-        dialog.setObjectName("institutionalDialog")
-        dialog.setStyleSheet(MODAL_STYLE)
-        dialog.setWindowTitle("Configuración")
-        dialog.setMinimumSize(520, 280)
-        layout = QVBoxLayout(dialog)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-        layout.addWidget(preparar_ventana_sin_marco(dialog, "Configuración", False))
-        content = QVBoxLayout()
-        content.setContentsMargins(24, 22, 24, 20)
-        content.setSpacing(12)
-        title = QLabel("Configuración de informes")
-        title.setStyleSheet("font-size: 18px; font-weight: 700; color: #071D38;")
-        title_row = QHBoxLayout()
-        title_row.addWidget(title, 1)
-        title_row.addWidget(MascotButton("configuracion", dialog))
-        content.addLayout(title_row)
-        description = QLabel(
-            "Define la carpeta base que se usará al preparar informes. "
-            "Esta configuración se aplica a la sesión actual."
-        )
-        description.setWordWrap(True)
-        content.addWidget(description)
-        folder = QLabel(self.excel_page.base_directory or "No seleccionada")
-        folder.setWordWrap(True)
-        content.addWidget(folder)
-        choose = QPushButton("Seleccionar carpeta base")
-        choose.clicked.connect(lambda: self._choose_base_directory(folder))
-        content.addWidget(choose)
-        content.addStretch()
-        buttons = QDialogButtonBox(QDialogButtonBox.Close)
-        buttons.rejected.connect(dialog.reject)
-        content.addWidget(buttons)
-        layout.addLayout(content, 1)
-        exec_modal(dialog)
-
-    def _choose_base_directory(self, label):
-        carpeta = QFileDialog.getExistingDirectory(self, "Seleccionar carpeta base")
-        if not carpeta:
-            return
-        self.excel_page.base_directory = carpeta
-        self.excel_page.base_label.setText(carpeta)
-        self.excel_page.base_label.setToolTip(carpeta)
-        self.excel_page._update_destination()
-        label.setText(carpeta)
-
     def _open_help(self):
         show_assistant(self, "inicio")
 
@@ -594,7 +558,7 @@ class DashboardWindow(QMainWindow):
             show_error(self, 'Manual no disponible', 'No se encontró el manual en la instalación. Contacta al responsable de la plataforma.')
             return
         selected, _ = QFileDialog.getSaveFileName(
-            self, 'Guardar manual de usuario', 'Manual_de_usuario_USTA.pdf', 'Documento PDF (*.pdf)'
+            self, 'Guardar manual de usuario', 'Manual_de_usuario_Santoto_Tunja.pdf', 'Documento PDF (*.pdf)'
         )
         if not selected:
             return

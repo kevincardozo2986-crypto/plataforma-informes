@@ -42,7 +42,7 @@ HELP_CONTENT = {
             "2. Crear informe: convierte el Excel en Word y PDF.",
             "3. Consultar historial: encuentra informes anteriores.",
         ],
-        "tip": "Si es tu primera vez, abre Ayuda en el menú lateral.",
+        "tip": "Puedes volver a esta guía desde Guía de inicio en el menú lateral. Usa Descargar manual para guardar las instrucciones completas.",
     },
     "excel": {
         "title": "Generación de Excel",
@@ -87,7 +87,7 @@ def mascot_pixmap(size=96):
 
 
 def draw_dog_face(size=64):
-    """Insignia de la app: perrito moderno estilo flat con degradado USTA."""
+    """Insignia de la app: perrito moderno estilo flat con degradado Santoto Tunja."""
     badge = QPixmap(str(TOMY_BADGE)) if TOMY_BADGE.is_file() else QPixmap()
     if not badge.isNull():
         from PySide6.QtGui import QPainterPath

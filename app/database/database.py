@@ -1,4 +1,6 @@
 import sqlite3
+import os
+import sys
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
@@ -6,7 +8,23 @@ from typing import Iterator
 
 # Partimos desde este archivo y subimos hasta la carpeta principal del proyecto.
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DATABASE_PATH = PROJECT_ROOT / "data" / "app.db"
+def database_path():
+    """Mantiene los datos de desarrollo y separa los del ejecutable instalado."""
+    override = os.environ.get("SANTOTO_DATA_DIR")
+    if override:
+        return Path(override).expanduser().resolve() / "app.db"
+    if not getattr(sys, "frozen", False):
+        return PROJECT_ROOT / "data" / "app.db"
+    if sys.platform == "win32":
+        base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
+    elif sys.platform == "darwin":
+        base = Path.home() / "Library" / "Application Support"
+    else:
+        base = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share"))
+    return base / "SantotoTunjaInformes" / "app.db"
+
+
+DATABASE_PATH = database_path()
 
 
 @contextmanager

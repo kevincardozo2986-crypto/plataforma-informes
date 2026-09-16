@@ -41,6 +41,11 @@ debug_output2/
 build/
 dist/
 *.spec
+!build.spec
+artifacts/
+.env
+.env.*
+.pytest_cache/
 
 # Logs
 *.log

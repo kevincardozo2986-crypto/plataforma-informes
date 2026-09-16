@@ -63,13 +63,14 @@ def test_password_se_almacena_como_hash():
     assert stored.startswith("scrypt$")
 
 
-def test_crea_admin_inicial_una_sola_vez():
+def test_crea_admin_inicial_una_sola_vez(monkeypatch):
+    monkeypatch.setenv("SANTOTO_ADMIN_PASSWORD", "PruebaInicial-123!")
     auth_service.initialize_auth()
     auth_service.initialize_auth()
 
     admin = auth_service.authenticate_user(
         auth_service.DEFAULT_ADMIN_USERNAME,
-        auth_service.DEFAULT_ADMIN_PASSWORD,
+        "PruebaInicial-123!",
     )
     assert admin is not None
     assert admin["role"] == "admin"
@@ -80,3 +81,18 @@ def test_crea_admin_inicial_una_sola_vez():
             (auth_service.DEFAULT_ADMIN_USERNAME,),
         ).fetchone()[0]
     assert count == 1
+
+
+def test_admin_requiere_password_sin_crear_cuenta_predeterminada(monkeypatch):
+    monkeypatch.delenv("SANTOTO_ADMIN_PASSWORD", raising=False)
+    assert auth_service.initialize_auth() is False
+    assert auth_service.get_user_by_username("admin") is None
+    assert auth_service.initialize_auth("ElegidaEnPrimerInicio!") is True
+    assert auth_service.authenticate_user("admin", "ElegidaEnPrimerInicio!")
+
+
+def test_no_recrea_admin_si_ya_hay_usuarios(monkeypatch):
+    monkeypatch.delenv("SANTOTO_ADMIN_PASSWORD", raising=False)
+    auth_service.create_user("responsable", "ClaveDePrueba!", "Responsable", "admin")
+    assert auth_service.initialize_auth() is True
+    assert auth_service.get_user_by_username("admin") is None

@@ -3,7 +3,7 @@ import traceback
 from pathlib import Path
 
 from PySide6.QtGui import QColor, QIcon, QPalette
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QInputDialog, QLineEdit
 
 from app.services.auth_service import initialize_auth
 from app.ui.dashboard_window import DashboardWindow
@@ -12,7 +12,6 @@ from app.ui.modal_dialogs import show_error
 
 
 def main():
-    initialize_auth()
     aplicacion = QApplication(sys.argv)
     aplicacion.setStyle("Fusion")
     paleta = QPalette()
@@ -53,6 +52,27 @@ def main():
 
     sys.excepthook = manejar_error_no_controlado
 
+    if not initialize_auth():
+        while True:
+            password, accepted = QInputDialog.getText(
+                None, "Primer inicio · Santoto Tunja",
+                "Crea la contraseña del administrador inicial:", QLineEdit.Password,
+            )
+            if not accepted:
+                return
+            if not password:
+                continue
+            confirmation, accepted = QInputDialog.getText(
+                None, "Confirmar contraseña", "Repite la contraseña:", QLineEdit.Password,
+            )
+            if not accepted:
+                return
+            if password != confirmation:
+                show_error(None, "Contraseñas diferentes", "Las contraseñas no coinciden. Intenta nuevamente.")
+                continue
+            initialize_auth(password)
+            break
+
     ventana_login = LoginWindow()
 
     def close_dashboard(ventana_dashboard):
@@ -80,4 +100,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) == 3 and sys.argv[1] == "--smoke-test":
+        from app.bundle_check import run
+        run(sys.argv[2])
+    else:
+        main()

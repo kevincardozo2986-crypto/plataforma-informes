@@ -67,13 +67,13 @@ class HistoryPage(QWidget):
         crest.setPixmap(QPixmap(str(Path(__file__).parent / 'assets' / 'usta-crest.png')).scaled(64, 64, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         crest.setAlignment(Qt.AlignCenter)
         side.addWidget(crest)
-        university = QLabel('UNIVERSIDAD\nSANTO TOMÁS')
+        university = QLabel('SANTOTO\nTUNJA')
         university.setAlignment(Qt.AlignCenter)
         university.setStyleSheet('font-size: 16px; font-weight: 600;')
         side.addWidget(university)
         side.addSpacing(24)
         self.side_links = []
-        for label, index in (('Inicio', -1), ('Mis informes', 0), ('Terminados', 1), ('Seguimiento', 2)):
+        for label, index in (('Volver al inicio', -1), ('Todos los procesos', 0), ('Terminados', 1), ('Pendientes', 2)):
             link = QPushButton(label, objectName='sideLink')
             if index < 0:
                 link.clicked.connect(self.back_requested.emit)
@@ -97,12 +97,12 @@ class HistoryPage(QWidget):
         root.setSpacing(14)
         nav = QHBoxLayout()
         heading = QVBoxLayout()
-        heading.addWidget(QLabel('Plataforma de Informes USTA', objectName='recordsTitle'))
+        heading.addWidget(QLabel('Plataforma de Informes Santoto Tunja', objectName='recordsTitle'))
         heading.addWidget(QLabel('Gestión y seguimiento de informes académicos', objectName='historyHint'))
         nav.addLayout(heading)
         nav.addStretch()
         nav.addWidget(MascotButton('historial', self))
-        user_label = QLabel(str(user.get('full_name') or user.get('username') or 'Usuario USTA'))
+        user_label = QLabel(str(user.get('full_name') or user.get('username') or 'Usuario Santoto Tunja'))
         user_label.setMaximumWidth(180)
         user_label.setWordWrap(True)
         nav.addWidget(user_label)

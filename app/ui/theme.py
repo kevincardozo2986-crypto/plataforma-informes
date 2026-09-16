@@ -320,11 +320,13 @@ QLabel#campusVirtualLabel {
 }
 QLabel#sidebarTitle { color: #FFFFFF; font-family: "Georgia"; font-size: 28px; font-weight: 700; line-height: 1.1; }
 QLabel#sidebarSubtitle { color: #C4D3E8; font-size: 12px; }
+QLabel#navSectionLabel { color: #A7BEDB; background: transparent; font-size: 10px; font-weight: 600; padding: 4px 8px; }
 QPushButton#navButton, QPushButton#activeNavButton, QPushButton#logoutNavButton {
     text-align: left; border: none; border-radius: 10px; padding: 11px 13px;
     color: #E4EDF8; background: transparent; font-size: 12px; font-weight: 500;
 }
 QPushButton#navButton:hover, QPushButton#logoutNavButton:hover { background-color: #0F4279; color: #FFFFFF; }
+QPushButton#navButton:focus, QPushButton#activeNavButton:focus, QPushButton#logoutNavButton:focus { border: 1px solid #8EBDF1; }
 QPushButton#activeNavButton { background-color: #1473D1; color: #FFFFFF; font-weight: 700; }
 QPushButton#logoutNavButton { color: #B9C9DE; }
 QLabel#sidebarAvatar { background-color: #547399; color: #FFFFFF; border-radius: 19px; font-weight: 700; }

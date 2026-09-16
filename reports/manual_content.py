@@ -1,6 +1,6 @@
 """Contenido editorial del manual; actualizar al cambiar los módulos."""
 PAGES = [
-('Manual de usuario', 'Plataforma de Informes USTA · Guía de operación', [
+('Manual de usuario', 'Plataforma de Informes Santoto Tunja · Guía de operación', [
 ('Una guía para trabajar con confianza', 'Preparación de datos de Moodle, generación de Excel, elaboración de informes Word y PDF y seguimiento de procesos académicos.'),
 ('Dirigido a', 'Usuarios de la plataforma y administradores de cuentas. No se requieren conocimientos de programación para seguir esta guía.'),
 ('Identificación del documento', 'Código documental: MU-PI-001\nVersión del manual: 1.1\nFecha de edición: 15 de septiembre de 2026\nElaborado para el proyecto de práctica empresarial de Kevin Esteban Cardozo Cepeda.'),
@@ -8,9 +8,9 @@ PAGES = [
 ('Uso del documento', 'Consulta el índice para ir al procedimiento que necesitas. Cada procedimiento indica qué debes tener preparado, qué hacer y cómo comprobar el resultado.')]),
 ('Control documental e índice', 'Edición 1.1 · Consulta rápida', [
 ('Control de cambios', '1.0 · Guía inicial de cinco páginas.\n1.1 · Se amplían procedimientos, roles, capturas, criterios de revisión, recuperación de procesos y solución de problemas.'),
-('Índice', '03 · Objetivo, alcance y responsabilidades\n04 · Preparación del equipo y los archivos\n05 · Acceso y navegación\n06 · Vista del inicio\n07 · Preparar Excel: configuración y carga\n08 · Preparar Excel: procesamiento y guardado\n09 · Crear el informe Word\n10 · Generar y revisar el PDF\n11 · Historial y recuperación de procesos\n12 · Vista del historial\n13 · Configuración y administración de usuarios\n14 · Tommy, manual y buenas prácticas\n15 · Solución de problemas\n16 · Revisión final, glosario y soporte'),
+('Índice', '03 · Objetivo, alcance y responsabilidades\n04 · Preparación del equipo y los archivos\n05 · Acceso y navegación\n06 · Vista del inicio\n07 · Preparar Excel: configuración y carga\n08 · Preparar Excel: procesamiento y guardado\n09 · Crear el informe Word\n10 · Generar y revisar el PDF\n11 · Historial y recuperación de procesos\n12 · Vista del historial\n13 · Carpeta de trabajo y usuarios\n14 · Tommy, manual y buenas prácticas\n15 · Solución de problemas\n16 · Revisión final, glosario y soporte'),
 ('Mantenimiento', 'Actualizar este manual cuando cambien los botones, el flujo de procesamiento, los permisos o la conversión de documentos. La versión del manual identifica el documento y no sustituye la versión del programa.'),
-('Referencia de elaboración', 'Contenido contrastado con los módulos de Inicio, Excel, Word/PDF, Historial, Configuración, Usuarios y Ayuda disponibles en el proyecto. No representa una certificación ni una aprobación institucional.')]),
+('Referencia de elaboración', 'Contenido contrastado con los módulos de Inicio, Preparar Excel, Crear Word y PDF, Historial, Usuarios y Guía de inicio disponibles en el proyecto. No representa una certificación ni una aprobación institucional.')]),
 ('Objetivo y alcance', 'Qué permite hacer la plataforma', [
 ('Objetivo', 'Orientar al usuario para transformar registros de actividad de Moodle en archivos organizados e informes académicos, verificar sus resultados y recuperar el avance de los procesos.'),
 ('Flujo general', 'CSV de Moodle → configuración académica → Excel procesado → Word institucional → PDF.\nEl historial permite consultar Excel terminados y retomar procesos de preparación pendientes.'),
@@ -27,13 +27,13 @@ PAGES = [
 ('Acceso y navegación', 'PR-01 · Entrar a la plataforma', [
 ('Antes de comenzar', 'Necesitas tu nombre de usuario y contraseña. Esta guía no incluye credenciales predeterminadas.'),
 ('Procedimiento', '1. Abre la aplicación.\n2. Escribe el usuario y la contraseña en la pantalla de bienvenida.\n3. Si necesitas revisar la escritura, utiliza el icono del ojo y vuelve a ocultar la contraseña.\n4. Pulsa «Iniciar sesión».\n5. Confirma que aparece el inicio con tu nombre o cuenta.'),
-('Cómo orientarte', 'Preparar Excel: transforma el CSV en el libro de trabajo.\nCrear informe: genera Word y PDF desde un Excel terminado.\nConsultar historial: muestra procesos, estados y opciones para abrir o retomar.\nInformes, en el menú: consulta los Excel finalizados.\nPlantillas, en esta edición: abre el módulo de preparación de Excel.'),
-('Opciones complementarias', 'Configuración permite elegir la carpeta base para la sesión. Ayuda abre la guía de Tommy. Manual de usuario permite guardar este PDF. Gestionar usuarios se muestra para administradores.'),
+('Cómo orientarte', 'Preparar Excel: transforma el CSV en el libro de trabajo.\nCrear informe: genera Word y PDF desde un Excel terminado.\nConsultar historial: muestra procesos, estados y opciones para abrir o retomar.\nCrear Word y PDF, en el menú: abre el generador de documentos. Historial reúne los procesos terminados y pendientes.'),
+('Opciones complementarias', 'La carpeta de destino se elige dentro de Preparar Excel. Guía de inicio explica los primeros pasos. Descargar manual permite guardar este PDF. Gestionar usuarios se muestra para administradores.'),
 ('Si no puedes ingresar', 'Comprueba la escritura y que tu cuenta esté activa. Si el error continúa, consulta al administrador. No compartas la contraseña ni hagas múltiples cambios de configuración intentando resolver un problema de acceso.'),
 ('Al terminar', 'Utiliza «Cerrar sesión» desde el menú, especialmente en equipos compartidos. Evita cerrar la aplicación mientras se esté generando un archivo.')]),
 ('Conoce la pantalla de inicio', 'Mapa visual de navegación', [
 ('@image', 'manual-home.png'),
-('1 · Menú lateral', 'Accede a Procesos, Informes, Historial, Plantillas, Configuración, Ayuda y Manual de usuario. Las opciones administrativas dependen de tu rol.'),
+('1 · Menú lateral', 'En MI TRABAJO encuentras Inicio, Preparar Excel, Crear Word y PDF e Historial. En AYUDA Y CONSULTA puedes abrir la Guía de inicio o Descargar manual. Las opciones administrativas dependen de tu rol.'),
 ('2 · Encabezado y tarjetas', 'El encabezado identifica la plataforma y la cuenta. Las tres tarjetas centrales organizan el trabajo en preparación de Excel, creación del informe y consulta del historial.'),
 ('3 · Tommy', 'La bienvenida se recoge automáticamente en la carita de ayuda. Puedes volver a consultar sus indicaciones cuando necesites orientación.'),
 ('Lectura de la imagen', 'Captura de la interfaz con una cuenta de demostración. La disposición puede ajustarse al tamaño de la ventana.')]),
@@ -76,17 +76,17 @@ PAGES = [
 ('2 · Búsqueda y estados', 'Los filtros ayudan a ubicar registros. Terminado permite abrir el Excel; Pendiente permite retomar el trabajo. La fecha de actualización corresponde al registro del proceso.'),
 ('3 · Acciones', 'Las acciones por fila permiten abrir o retomar. También puedes seleccionar un proceso y usar el botón inferior. La búsqueda de archivos guardados se realiza en una carpeta elegida por el usuario.'),
 ('Datos de la captura', 'Todos los nombres y registros de esta imagen son demostrativos; no corresponden a estudiantes ni a resultados académicos reales.')]),
-('Configuración y usuarios', 'PR-07 · Opciones complementarias', [
-('Elegir la carpeta base', 'Abre Configuración, revisa la ubicación actual y pulsa «Seleccionar carpeta base». Elige la carpeta y comprueba el nuevo valor. Esta configuración se aplica a la sesión actual; revisa el destino al comenzar un nuevo trabajo.'),
+('Carpeta de trabajo y usuarios', 'PR-07 · Opciones complementarias', [
+('Elegir la carpeta base', 'Abre Preparar Excel y pulsa «Seleccionar carpeta» en la sección de destino. Elige la carpeta y comprueba el nuevo valor. Esta configuración se aplica a la sesión actual; revisa el destino al comenzar un nuevo trabajo.'),
 ('Crear una cuenta — administrador', '1. Abre Gestionar usuarios.\n2. Usa la opción de crear usuario.\n3. Completa nombre de usuario, nombre completo y contraseña.\n4. Elige Usuario o Administrador.\n5. Define si se permite iniciar sesión.\n6. Guarda y comprueba que la cuenta aparece en la lista.'),
 ('Editar una cuenta', 'Selecciona la opción de edición de la cuenta correcta. Revisa cuidadosamente nombre, rol y estado. En edición, dejar la contraseña vacía conserva la actual; escribe una nueva solo si necesitas cambiarla.'),
 ('Activar, desactivar o eliminar', 'La gestión de cuentas es una tarea administrativa. Lee las confirmaciones y verifica la identidad antes de aplicar cambios. No intentes desactivar tu propio acceso ni modificar permisos sin coordinación con el responsable de la plataforma.'),
 ('Resultado esperado', 'Los datos y permisos guardados corresponden a la cuenta seleccionada. Para una cuenta nueva, verifica que la persona autorizada reciba las indicaciones de acceso por un canal adecuado.'),
-('Acceso Plantillas', 'En esta edición, el acceso Plantillas dirige a la preparación de Excel. No es un editor independiente de plantillas Word.')]),
+('Plantilla del informe', 'La plantilla institucional se aplica automáticamente al crear el Word. Abre Crear Word y PDF para generar el documento desde un Excel terminado.')]),
 ('Ayuda y cuidado de la información', 'Tommy, manual y hábitos de trabajo', [
 ('Usar la ayuda de Tommy', 'En Inicio, la bienvenida se recoge automáticamente en la carita. Pulsa la carita para mostrar u ocultar la burbuja. «Muéstrame cómo» abre los pasos de la sección. En las pantallas con icono de ayuda, pulsa la imagen de Tommy. Usa Anterior, Siguiente y Entendido para recorrer la guía.'),
 ('Mover la mascota', 'Donde está disponible como mascota flotante, puedes arrastrar la carita para despejar un área. En el generador Word su movimiento se limita al encabezado para mantenerla dentro de su zona de ayuda.'),
-('Guardar este manual', 'Desde el menú izquierdo de Inicio, pulsa Manual de usuario. Elige carpeta y nombre en la ventana de guardado. Espera la confirmación. Puedes consultar el PDF sin iniciar otra generación de informes.'),
+('Guardar este manual', 'Desde el menú izquierdo de Inicio, pulsa Descargar manual. Elige carpeta y nombre en la ventana de guardado. Espera la confirmación. Puedes consultar el PDF sin iniciar otra generación de informes.'),
 ('Buenas prácticas', 'Usa únicamente datos que estés autorizado a consultar. No compartas contraseñas. Evita enviar CSV e informes por canales no autorizados. Oculta datos personales en capturas de soporte y revisa destinatarios antes de compartir archivos.'),
 ('Conservación de archivos', 'Mantén el CSV original y las versiones entregadas en una ubicación organizada. Realiza copias según las instrucciones de tu institución. Los registros del historial no son una copia de seguridad de los archivos físicos.'),
 ('Recomendación de operación', 'Estas pautas orientan el uso responsable de la aplicación; los permisos, canales de entrega y plazos de conservación deben seguir las indicaciones de la institución.')]),

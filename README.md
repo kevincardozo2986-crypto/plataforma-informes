@@ -1,4 +1,4 @@
-# Plataforma de Informes USTA
+# Plataforma de Informes Santoto Tunja
 
 Aplicación de escritorio para transformar archivos CSV exportados desde Moodle en informes Excel institucionales y, a partir del Excel terminado, generar el informe Word institucional con sus gráficos y su conversión a PDF. El proyecto permite administrar usuarios, configurar la información académica y ejecutar un flujo guiado de procesamiento sin depender de Microsoft Excel para el procesamiento.
 
@@ -27,7 +27,7 @@ Aplicación de escritorio para transformar archivos CSV exportados desde Moodle 
 - Guardado automático del avance y recuperación de informes incompletos.
 - Reintento de pasos fallidos sin cerrar la aplicación.
 - Generación de informe Word institucional desde el Excel terminado, con tablas y gráficos Matplotlib.
-- Conversión de Word a PDF en la misma carpeta (intenta `docx2pdf`, Word por COM y LibreOffice, en ese orden).
+- Conversión de Word a PDF en la misma carpeta (intenta primero LibreOffice y después las alternativas de Microsoft Word disponibles).
 - Interfaz institucional con ventanas y diálogos personalizados.
 
 ## Hojas del libro Excel
@@ -80,7 +80,7 @@ templates/PLANTILLA_INFORME.docx
 
 No es necesario seleccionarla manualmente: la aplicación la localiza automáticamente desde esa carpeta, incluso al ejecutarse como aplicación empaquetada.
 
-La conversión a PDF (`app/services/pdf_report_service.py:52`, `convert_word_to_pdf`) guarda el PDF junto al Word. En Windows requiere Word instalado o `pip install docx2pdf pywin32`; en Linux/macOS requiere LibreOffice (`soffice`).
+La conversión a PDF guarda el PDF junto al Word. Requiere LibreOffice o Microsoft Word instalado en el equipo de destino; instalar las librerías Python no instala estas aplicaciones.
 
 ## Requisitos del CSV
 
@@ -142,14 +142,7 @@ pip install -r requirements.txt
 python main.py
 ```
 
-En la primera ejecución se crea automáticamente la base de datos local y un administrador inicial:
-
-```text
-Usuario: admin
-Contraseña: Admin123
-```
-
-Se recomienda cambiar esta contraseña desde la administración de usuarios antes de utilizar la aplicación con información real.
+En la primera ejecución se crea la base local y se solicita una contraseña para el administrador inicial (`admin`). También puedes definir `SANTOTO_ADMIN_USERNAME` y `SANTOTO_ADMIN_PASSWORD` en el entorno del equipo de destino antes de iniciar. No hay contraseña predeterminada ni se incluyen cuentas en el ejecutable. Las cuentas existentes se conservan.
 
 ## Flujo de uso
 
@@ -185,7 +178,7 @@ La suite actual contiene 46 pruebas automatizadas en 7 archivos (`tests/test_*.p
 
 ## Datos locales
 
-La base SQLite, los CSV reales, los informes generados y las carpetas de depuración no se suben al repositorio. Están excluidos mediante `.gitignore` para evitar publicar datos institucionales o personales.
+La base SQLite y los CSV reales están excluidos mediante `.gitignore`. Hay documentos de trabajo ya versionados; las reglas de exclusión no los retiran del historial. El empaquetado incluye solo los recursos de ejecución y deja fuera esos documentos y los datos locales.
 
 Rutas locales principales:
 
@@ -219,3 +212,9 @@ main.py           # Punto de entrada
 ## Estado del proyecto
 
 Proyecto académico en desarrollo para la automatización de informes de uso de Moodle de la Universidad Santo Tomás. Genera el libro Excel completo, el Word institucional y su PDF.
+
+## Empaquetado para Windows y macOS
+
+El workflow **Build** (`.github/workflows/build.yml`) se ejecuta manualmente desde **Actions → Build → Run workflow**. Compila el mismo código con `build.spec` en runners independientes de Windows y macOS y entrega los artifacts `SantotoTunjaInformes-Windows` y `SantotoTunjaInformes-macOS`.
+
+Consulta [Distribución y requisitos del equipo de destino](docs/DISTRIBUCION.md) para el primer inicio, ubicación de SQLite, builds locales, limitaciones de firma y requisitos de conversión a PDF. El workflow debe estar en la rama predeterminada de GitHub para aparecer en la interfaz de ejecución manual.
