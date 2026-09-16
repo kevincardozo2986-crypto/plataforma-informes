@@ -22,41 +22,48 @@ from app.ui.theme import EXCEL_MODULE_STYLESHEET
 
 
 WORD_STYLE = EXCEL_MODULE_STYLESHEET + """
-QFrame#wordHero { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #123F91, stop:0.55 #0759B6, stop:1 #261478); border: none; border-radius: 16px; }
+QWidget#excelProcessPage QLabel, QWidget#excelProcessPage QPushButton, QWidget#excelProcessPage QLineEdit, QWidget#excelProcessPage QComboBox, QWidget#excelProcessPage QListWidget { font-family: "Segoe UI"; }
+QFrame#wordHero { background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #092C53, stop:1 #14569A); border: none; border-radius: 18px; }
 QLabel#wordHeroImage { background: transparent; border: none; }
-QLabel#wordEyebrow { color: #78E3F8; font-size: 9px; font-weight: 900; letter-spacing: 2px; }
-QLabel#wordTitle { color: #FFFFFF; font-size: 26px; font-weight: 800; }
-QLabel#wordSubtitle { color: #E5F1FF; font-size: 11px; }
-QLabel#wordStepNumber { color: #0D4380; background-color: #8EE8F7; border-radius: 10px; font-size: 9px; font-weight: 900; }
-QLabel#wordStepText { color: #FFFFFF; font-size: 9px; font-weight: 800; }
+QLabel#wordEyebrow { color: #F4CE67; font-size: 10px; font-weight: 600; letter-spacing: 1px; }
+QLabel#wordTitle { color: #FFFFFF; font-size: 28px; font-weight: 700; }
+QLabel#wordSubtitle { color: #D9E7F6; font-size: 13px; }
+QLabel#wordStepNumber { color: #183455; background-color: #F4CE67; border-radius: 10px; font-size: 10px; font-weight: 700; }
+QLabel#wordStepText { color: #E5EFF9; font-size: 11px; font-weight: 600; }
 QLabel#wordStepArrow { color: #78CDEB; font-size: 11px; }
 QFrame#wordPanel { background-color: #FFFFFF; border: 1px solid #D9E2EC; border-radius: 14px; }
 QLabel#wordSection { color: #102A49; font-size: 16px; font-weight: 800; }
-QLabel#wordPanelHint { color: #718096; font-size: 10px; }
+QLabel#wordPanelHint { color: #617185; font-size: 12px; }
 QLabel#wordMuted { color: #718096; font-size: 10px; }
 QLineEdit#reportSearch, QComboBox#reportFilter {
     background-color: #F8FAFC; color: #173653; border: 1px solid #D3DDE8;
     border-radius: 9px; padding: 9px 12px; min-height: 22px;
 }
 QLineEdit#reportSearch:focus, QComboBox#reportFilter:focus { border: 2px solid #0B67D1; }
-QComboBox#reportFilter { color: #0B67D1; font-weight: 800; background-color: #F4F8FF; }
-QListWidget#reportList { background: #F5F8FB; border: 1px solid #DFE7EF; border-radius: 10px; padding: 6px; outline: 0; }
-QListWidget#reportList::item { color: #173653; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 9px; padding: 12px; margin: 3px; }
+QComboBox#reportFilter { color: #42566D; font-weight: 500; background-color: #FFFFFF; }
+QListWidget#reportList { background: #FFFFFF; border: none; padding: 0px; outline: 0; font-size: 13px; }
+QListWidget#reportList::item { color: #173653; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 6px; padding: 8px; margin: 0px 0px 6px 0px; }
 QListWidget#reportList::item:hover { border-color: #83B8EA; background: #F3F8FE; }
-QListWidget#reportList::item:selected { color: #073A6F; border: 2px solid #0B67D1; background: #EAF3FC; }
+QListWidget#reportList::item:selected { color: #073A6F; border: 1px solid #9CBADD; background: #EDF4FC; }
 QLabel#countBadge { color: #075EAE; background: #E5F2FF; border-radius: 10px; padding: 4px 9px; font-weight: 800; }
-QLabel#selectionTitle { color: #0B315A; font-size: 18px; font-weight: 800; }
+QLabel#selectionTitle { color: #0B315A; font-size: 20px; font-weight: 700; padding: 10px 12px; background: #F0F5FC; border-left: 3px solid #D5AB39; border-radius: 4px; }
 QLabel#selectionBadge { color: #137346; background-color: #E3F4EA; border-radius: 10px; padding: 5px 10px; font-size: 9px; font-weight: 900; }
 QLabel#detailLabel { color: #64748B; font-size: 10px; font-weight: 700; }
-QLabel#detailValue { color: #183455; font-size: 11px; background: #F5F8FB; border: 1px solid #E7EDF3; border-radius: 8px; padding: 9px; }
-QFrame#wordActionArea { background-color: #F5F9FD; border: 1px solid #DDE8F2; border-radius: 10px; }
+QLabel#detailValue { color: #183455; font-size: 13px; background: transparent; border: none; padding: 0px 0px 6px 0px; }
+QFrame#wordActionArea { background-color: #F7F9FC; border: none; border-radius: 8px; }
+QLabel#excelFeedback { background: transparent; border: none; padding: 4px 0px; color: #53677D; font-size: 12px; }
 QPushButton#wordPrimary { background: #0B67D1; color: white; border: none; border-radius: 9px; padding: 12px 18px; font-size: 12px; font-weight: 900; }
 QPushButton#wordPrimary:hover { background: #0959B7; }
 QPushButton#wordPrimary:disabled { background: #D8E0E9; color: #929EAC; }
 QPushButton#wordAction { background: #FFFFFF; color: #0B5DAC; border: 1px solid #B7CCE1; border-radius: 8px; padding: 9px 14px; font-weight: 800; }
 QPushButton#wordAction:hover { background: #EDF6FF; }
-QPushButton#wordSelectAction { background: #176CE0; color: #FFFFFF; border: none; border-radius: 8px; padding: 9px 14px; font-weight: 900; }
-QPushButton#wordSelectAction:hover { background: #0D5FCB; }
+QPushButton#wordPdfAction { background: #C62828; color: #FFFFFF; border: 1px solid #C62828; border-radius: 8px; padding: 9px 14px; font-size: 12px; font-weight: 700; }
+QPushButton#wordPdfAction:hover { background: #B71C1C; border-color: #B71C1C; }
+QPushButton#wordPdfAction:pressed { background: #991B1B; border-color: #991B1B; }
+QPushButton#wordPdfAction:disabled { background: #F3DADA; color: #886767; border-color: #E9CCCC; }
+QPushButton#wordPdfAction:focus { border: 2px solid #F59E9E; }
+QPushButton#wordSelectAction { background: #FFFFFF; color: #0B5DAC; border: 1px solid #B7CCE1; border-radius: 8px; padding: 9px 14px; font-weight: 600; }
+QPushButton#wordSelectAction:hover { background: #EDF6FF; }
 """
 
 
@@ -95,29 +102,32 @@ class WordReportWindow(QWidget):
         self._thread = None
         self._worker = None
         self._build_ui()
-        anchor_bottom_right(self, "word")
 
     def _build_ui(self):
         root = QVBoxLayout(self)
-        root.setContentsMargins(30, 20, 30, 20)
-        root.setSpacing(13)
-        back = QPushButton("<-  Volver al dashboard", objectName="excelBackButton")
+        root.setContentsMargins(24, 14, 24, 16)
+        root.setSpacing(14)
+        navigation = QHBoxLayout()
+        back = QPushButton("←  Volver al dashboard", objectName="excelBackButton")
         back.clicked.connect(self.back_requested.emit)
-        root.addWidget(back, alignment=Qt.AlignLeft)
+        navigation.addWidget(back)
+        navigation.addStretch()
+        navigation.addWidget(QLabel("PLATAFORMA DE INFORMES  ·  USTA", objectName="wordMuted"))
+        root.addLayout(navigation)
 
         hero = QFrame(objectName="wordHero")
         hero_box = QHBoxLayout(hero)
-        hero_box.setContentsMargins(25, 14, 25, 14)
+        hero_box.setContentsMargins(24, 18, 24, 18)
         hero_box.setSpacing(12)
         hero_copy = QVBoxLayout()
-        hero_copy.setSpacing(2)
-        eyebrow = QLabel("GENERADOR INSTITUCIONAL  /  EXCEL A WORD", objectName="wordEyebrow")
-        title = QLabel("Construye el informe final", objectName="wordTitle")
+        hero_copy.setSpacing(8)
+        eyebrow = QLabel("INFORMES  /  GENERACIÓN DE DOCUMENTOS", objectName="wordEyebrow")
+        title = QLabel("Generar informe Word", objectName="wordTitle")
         for label in (eyebrow, title):
             label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         hero_copy.addWidget(eyebrow)
         hero_copy.addWidget(title)
-        subtitle = QLabel("Busca un Excel terminado, revisa sus datos y genera el documento con graficos y plantilla institucional.", objectName="wordSubtitle")
+        subtitle = QLabel("Selecciona un Excel y crea tu informe con la plantilla institucional.", objectName="wordSubtitle")
         subtitle.setWordWrap(True)
         subtitle.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         hero_copy.addWidget(subtitle)
@@ -134,15 +144,10 @@ class WordReportWindow(QWidget):
         steps.addStretch()
         hero_copy.addLayout(steps)
         hero_box.addLayout(hero_copy, 4)
-        hero_image = QLabel(objectName="wordHeroImage")
-        hero_image.setAlignment(Qt.AlignCenter)
-        hero_image.setPixmap(
-            QPixmap(str(Path(__file__).parent / "assets" / "excel-to-word-hero.png")).scaled(
-                330, 135, Qt.KeepAspectRatio, Qt.SmoothTransformation
-            )
-        )
-        hero_image.setFixedSize(340, 135)
-        hero_box.addWidget(hero_image, 3)
+        # Reserve a dedicated area for Tomy so his bubble never covers controls.
+        hero_box.addSpacing(290)
+        hero.setMinimumHeight(164)
+        self._mascot_buddy = anchor_bottom_right(hero, "word")
         root.addWidget(hero)
 
         content = QHBoxLayout()
@@ -151,8 +156,9 @@ class WordReportWindow(QWidget):
         explorer = QFrame(objectName="wordPanel")
         left = QVBoxLayout(explorer)
         left.setContentsMargins(18, 16, 18, 16)
+        left.setSpacing(10)
         heading = QHBoxLayout()
-        heading.addWidget(QLabel("Excel terminados", objectName="wordSection"))
+        heading.addWidget(QLabel("Archivos disponibles", objectName="wordSection"))
         self.count_badge = QLabel("0 disponibles", objectName="countBadge")
         heading.addStretch()
         heading.addWidget(self.count_badge)
@@ -193,6 +199,7 @@ class WordReportWindow(QWidget):
         details = QFrame(objectName="wordPanel")
         right = QVBoxLayout(details)
         right.setContentsMargins(20, 16, 20, 16)
+        right.setSpacing(8)
         detail_heading = QHBoxLayout()
         detail_heading.addWidget(QLabel("Resumen del documento", objectName="wordSection"))
         detail_heading.addStretch()
@@ -207,13 +214,21 @@ class WordReportWindow(QWidget):
         right.addWidget(self.selection_title)
         self.detail_values = {}
         detail_grid = QGridLayout()
+        detail_grid.setVerticalSpacing(5)
+        detail_grid.setHorizontalSpacing(20)
+        detail_grid.setColumnStretch(0, 1)
+        detail_grid.setColumnStretch(1, 1)
         fields = (("program", "PROGRAMA"), ("period", "PERIODO"), ("events", "EVENTOS REGISTRADOS"), ("file", "ARCHIVO DE ORIGEN"), ("output", "DOCUMENTO DE SALIDA"))
-        for row, (key, label) in enumerate(fields):
-            detail_grid.addWidget(QLabel(label, objectName="detailLabel"), row * 2, 0)
+        positions = ((0, 0, 2), (2, 0, 1), (2, 1, 1), (4, 0, 2), (6, 0, 2))
+        for (key, label), (row, column, span) in zip(fields, positions):
+            detail_grid.addWidget(QLabel(label, objectName="detailLabel"), row, column, 1, span)
             value = QLabel("-", objectName="detailValue")
             value.setWordWrap(True)
+            value.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            value.setMinimumWidth(0)
+            value.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
             self.detail_values[key] = value
-            detail_grid.addWidget(value, row * 2 + 1, 0)
+            detail_grid.addWidget(value, row + 1, column, 1, span)
         right.addLayout(detail_grid)
         right.addStretch()
         action_area = QFrame(objectName="wordActionArea")
@@ -232,7 +247,10 @@ class WordReportWindow(QWidget):
         action_box.addWidget(self.generate_button)
         generated_actions = QHBoxLayout()
         self.open_button = QPushButton("Abrir Word", objectName="wordAction")
-        self.pdf_button = QPushButton("Generar PDF", objectName="wordAction")
+        self.pdf_button = QPushButton("Generar PDF", objectName="wordPdfAction")
+        self.pdf_button.setIcon(QIcon(str(Path(__file__).parent / "assets" / "pdf.svg")))
+        self.pdf_button.setIconSize(QSize(24, 24))
+        self.pdf_button.setCursor(Qt.PointingHandCursor)
         self.open_button.clicked.connect(self._open_generated)
         self.pdf_button.clicked.connect(self._generate_pdf)
         self.open_button.hide()
@@ -320,11 +338,12 @@ class WordReportWindow(QWidget):
                     str(report.get("modality") or ""),
                 ) if value
             )
-            text = f'{report.get("program", "Sin programa")}\n{context}\n{path.name}'
+            text = f'{report.get("program", "Sin programa")}\n{context}'
             item = QListWidgetItem(text)
+            item.setToolTip(f'{text}\n{path.name}')
             item.setIcon(self._excel_icon())
             item.setData(Qt.UserRole, report)
-            item.setSizeHint(QSize(0, 78))
+            item.setSizeHint(QSize(0, 72))
             self.report_list.addItem(item)
         self.count_badge.setText(f"{len(filtered)} disponibles")
         if filtered:
@@ -344,7 +363,7 @@ class WordReportWindow(QWidget):
         self.current_program = str(report.get("program") or "")
         self.current_period = str(report.get("period") or "")
         self.selection_badge.setText("LISTO PARA GENERAR")
-        self.selection_title.setText(path.stem)
+        self.selection_title.setText(self.current_program or path.stem)
         self.detail_values["program"].setText(self.current_program or "Sin identificar")
         self.detail_values["period"].setText(self.current_period or "Sin identificar")
         self.detail_values["file"].setText(path.name)

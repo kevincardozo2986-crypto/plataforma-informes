@@ -305,40 +305,79 @@ QFrame#flowStatus { background-color: rgba(255, 255, 255, 210); border: 1px soli
 QLabel#statusDot { background: transparent; color: #36BCE8; font-size: 13px; }
 QLabel#statusText { background: transparent; color: #70778A; font-size: 11px; }
 
-/* Dashboard institucional */
+/* Dashboard institucional premium */
 QWidget#dashboardPage { background-color: #F7F9FC; color: #0B2240; font-family: "Segoe UI"; }
-QFrame#dashboardSidebar { background-color: #062F62; border: none; }
-QLabel#sidebarUniversity { color: #FFFFFF; font-size: 10px; font-weight: 800; letter-spacing: 1px; }
-QLabel#sidebarTitle { color: #FFFFFF; font-family: "Georgia"; font-size: 27px; font-weight: 700; }
-QLabel#sidebarSubtitle { color: #B9C9DE; font-size: 12px; line-height: 1.4; }
+QFrame#dashboardSidebar {
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #0A3566, stop:1 #062652);
+    border: none;
+}
+QLabel#brandLogo { background: transparent; border: none; }
+QLabel#sidebarUniversity { background: transparent; color: #EAF1FA; font-size: 10px; font-weight: 800; letter-spacing: 1px; }
+QLabel#campusVirtualLabel {
+    background: transparent; color: #4ED6F5;
+    font-size: 15px; font-weight: 900; letter-spacing: 2px;
+}
+QLabel#sidebarTitle { color: #FFFFFF; font-family: "Georgia"; font-size: 28px; font-weight: 700; line-height: 1.1; }
+QLabel#sidebarSubtitle { color: #C4D3E8; font-size: 12px; }
 QPushButton#navButton, QPushButton#activeNavButton, QPushButton#logoutNavButton {
-    text-align: left; border: none; border-radius: 10px; padding: 10px 13px;
+    text-align: left; border: none; border-radius: 10px; padding: 11px 13px;
     color: #E4EDF8; background: transparent; font-size: 12px; font-weight: 500;
 }
-QPushButton#navButton:hover, QPushButton#logoutNavButton:hover { background-color: #0B3B70; color: #FFFFFF; }
-QPushButton#activeNavButton { background-color: #1555A5; color: #FFFFFF; font-weight: 700; }
+QPushButton#navButton:hover, QPushButton#logoutNavButton:hover { background-color: #0F4279; color: #FFFFFF; }
+QPushButton#activeNavButton { background-color: #1473D1; color: #FFFFFF; font-weight: 700; }
+QPushButton#logoutNavButton { color: #B9C9DE; }
 QLabel#sidebarAvatar { background-color: #547399; color: #FFFFFF; border-radius: 19px; font-weight: 700; }
 QLabel#sidebarProfile { color: #FFFFFF; font-size: 11px; }
 QWidget#dashboardContent { background-color: #F8FAFD; }
-QLabel#dashboardSection { color: #183455; font-size: 12px; font-weight: 600; }
-QLabel#dashboardUser { color: #142C49; font-size: 12px; font-weight: 600; }
-QFrame#headerLine { background-color: #DDE3EB; border: none; }
+QScrollArea#workflowScroll { background: transparent; border: none; }
+QScrollArea#workflowScroll QScrollBar:horizontal {
+    background: #EAF0F6; height: 10px; margin: 0;
+}
+QScrollArea#workflowScroll QScrollBar::handle:horizontal {
+    background: #A9BDD4; min-width: 40px; border-radius: 5px;
+}
+QScrollArea#workflowScroll QScrollBar::handle:horizontal:hover { background: #7FA0C2; }
+QScrollArea#workflowScroll QScrollBar::add-line:horizontal,
+QScrollArea#workflowScroll QScrollBar::sub-line:horizontal { width: 0; }
+QLabel#dashboardSection { color: #3E5876; font-size: 12px; font-weight: 600; }
+QWidget#breadcrumbWidget { background: transparent; }
+QLabel#breadcrumbHome { background: transparent; color: #8A97AB; font-size: 14px; }
+QLabel#breadcrumbLink { background: transparent; color: #5B6B82; font-size: 12px; font-weight: 600; }
+QLabel#breadcrumbSeparator { background: transparent; color: #8A97AB; font-size: 12px; font-weight: 700; }
+QLabel#breadcrumbActive { background: transparent; color: #1B3A5F; font-size: 12px; font-weight: 800; }
+QFrame#userPill {
+    background-color: #FFFFFF; border: 1px solid #DCE5EF; border-radius: 18px;
+}
+QLabel#userAvatar {
+    background-color: #0B62CE; color: #FFFFFF;
+    border-radius: 15px; font-size: 13px; font-weight: 800;
+}
+QLabel#dashboardUserName { background: transparent; color: #142C49; font-size: 12px; font-weight: 800; }
+QLabel#roleBadge { background: transparent; color: #5B6B82; font-size: 10px; font-weight: 600; }
+QLabel#dashboardUser {
+    background-color: #FFFFFF; color: #142C49; font-size: 12px; font-weight: 700;
+    border: 1px solid #DCE5EF; border-radius: 14px; padding: 7px 14px;
+}
+QFrame#headerLine { background-color: #E2E8F0; border: none; margin-top: 6px; }
 QLabel#routeEyebrow { color: #285998; font-size: 10px; font-weight: 900; letter-spacing: 2px; }
 QLabel#routeTitle { color: #061E49; font-family: "Segoe UI"; font-size: 34px; font-weight: 800; }
 QLabel#routeSubtitle { color: #63728A; font-family: "Segoe UI"; font-size: 13px; font-weight: 400; }
 QWidget#workflowPanel { background: transparent; }
 QFrame#processCard { background-color: #FFFFFF; border: 1px solid #D7DFEA; border-radius: 18px; }
-QFrame#processCard:hover { border: 1px solid #7FA8D8; background-color: #FFFFFF; }
-QLabel#stepBadge { background-color: #1767C5; color: #FFFFFF; border-radius: 17px; font-size: 14px; font-weight: 800; }
+QFrame#processCard:hover { border: 1px solid #1473D1; }
+QLabel#stepBadge { background-color: #1473D1; color: #FFFFFF; border-radius: 17px; font-size: 14px; font-weight: 800; }
 QLabel#processIcon { background: transparent; }
+QLabel#processDecoration { background: transparent; }
 QLabel#processTitle { color: #071F4D; font-size: 17px; font-weight: 800; }
 QLabel#processDescription { color: #62728A; font-size: 12px; }
 QPushButton#openModuleButton {
     background-color: #0B62CE; color: #FFFFFF; border: none;
-    border-radius: 10px; padding: 10px 16px; font-size: 12px; font-weight: 800;
+    border-radius: 10px; padding: 11px 16px; font-size: 12px; font-weight: 800;
 }
 QPushButton#openModuleButton:hover { background-color: #084EA7; color: #FFFFFF; }
-QLabel#dashboardFooter { color: #7D899A; font-size: 9px; }
+QPushButton#openModuleButton:pressed { background-color: #063C82; }
+QLabel#dashboardFooter { color: #7D899A; font-size: 10px; }
 """
 
 

@@ -9,8 +9,7 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
 
 CHROME_STYLE = """
 QWidget#mainTitleBar {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-        stop:0 #05294F, stop:0.55 #073B6E, stop:1 #0A4A84);
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #05294F, stop:1 #0A4A84);
     border: none; border-bottom: 2px solid #2C6DA5;
 }
 QWidget#dialogTitleBar {
@@ -32,10 +31,10 @@ QPushButton#dialogWindowClose {
     font-family: "Segoe UI"; font-size: 13px; font-weight: 600;
 }
 QPushButton#mainWindowControl, QPushButton#mainWindowClose {
-    background-color: #124D7F; color: #FFFFFF;
-    border: none; border-left: 1px solid #2A628F;
+    background-color: transparent; color: #FFFFFF;
+    border: none;
 }
-QPushButton#mainWindowControl:hover { background-color: #24699F; color: #FFFFFF; }
+QPushButton#mainWindowControl:hover { background-color: #EDF4FB; color: #173653; }
 QPushButton#mainWindowClose:hover { background-color: #C42B3A; color: #FFFFFF; }
 QPushButton#dialogWindowClose {
     background-color: #164F80; color: #FFFFFF; font-size: 15px;
@@ -46,14 +45,14 @@ QPushButton#dialogWindowClose:hover { background-color: #FCE8EA; color: #B42332;
 
 
 class WindowTitleBar(QWidget):
-    def __init__(self, ventana, titulo, controles_completos=True):
+    def __init__(self, ventana, titulo, controles_completos=True, mostrar_logo=True):
         super().__init__(ventana)
         self.ventana = ventana
         self.controles_completos = controles_completos
         self._posicion_arrastre = None
         self.setObjectName("mainTitleBar" if controles_completos else "dialogTitleBar")
         self.setAttribute(Qt.WA_StyledBackground, True)
-        altura = 44 if controles_completos else 40
+        altura = 48 if controles_completos else 40
         self.setFixedHeight(altura)
         self.setStyleSheet(CHROME_STYLE)
 
@@ -64,25 +63,17 @@ class WindowTitleBar(QWidget):
         if controles_completos:
             marca = QLabel()
             marca.setObjectName("windowBrandMark")
-            ruta_escudo = Path(__file__).parent / "assets" / "usta-crest.png"
-            marca.setPixmap(
-                QPixmap(str(ruta_escudo)).scaled(
-                    25, 25, Qt.KeepAspectRatio, Qt.SmoothTransformation
-                )
-            )
-            marca.setFixedSize(32, 32)
+            marca.setPixmap(QPixmap(str(Path(__file__).parent / "assets" / "usta-crest.png")).scaled(28, 28, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            marca.setFixedSize(36, 36)
             marca.setAlignment(Qt.AlignCenter)
+            marca.setAccessibleName("Universidad Santo Tomás")
+            marca.setAttribute(Qt.WA_TransparentForMouseEvents)
             diseno.addWidget(marca)
+            marca.setVisible(mostrar_logo)
             diseno.addSpacing(9)
-            textos = QHBoxLayout()
-            textos.setSpacing(10)
-            self.titulo = QLabel(titulo)
-            self.titulo.setObjectName("mainWindowTitle")
-            contexto = QLabel("•  UNIVERSIDAD SANTO TOMÁS")
-            contexto.setObjectName("mainWindowContext")
-            textos.addWidget(self.titulo)
-            textos.addWidget(contexto)
-            diseno.addLayout(textos)
+            self.titulo = QLabel(titulo, objectName="mainWindowTitle")
+            self.titulo.setAttribute(Qt.WA_TransparentForMouseEvents)
+            diseno.addWidget(self.titulo)
         else:
             marca = QLabel()
             marca.setObjectName("windowBrandMark")
@@ -159,6 +150,6 @@ class WindowTitleBar(QWidget):
             evento.accept()
 
 
-def preparar_ventana_sin_marco(ventana, titulo, controles_completos=False):
+def preparar_ventana_sin_marco(ventana, titulo, controles_completos=False, mostrar_logo=True):
     ventana.setWindowFlags(ventana.windowFlags() | Qt.FramelessWindowHint)
-    return WindowTitleBar(ventana, titulo, controles_completos)
+    return WindowTitleBar(ventana, titulo, controles_completos, mostrar_logo)
