@@ -215,6 +215,8 @@ Proyecto académico en desarrollo para la automatización de informes de uso de 
 
 ## Empaquetado para Windows y macOS
 
-El workflow **Build** (`.github/workflows/build.yml`) se ejecuta manualmente desde **Actions → Build → Run workflow**. Compila el mismo código con `build.spec` en runners independientes de Windows y macOS y entrega los artifacts `SantotoTunjaInformes-Windows` y `SantotoTunjaInformes-macOS`.
+El workflow **Build** (`.github/workflows/build.yml`) se ejecuta manualmente desde **Actions → Build → Run workflow**. Compila el mismo código con `build.spec` en runners independientes de Windows y macOS y entrega los artifacts `SantotoTunjaInformes-Windows` y `SantotoTunjaInformes-macOS-Intel` y `SantotoTunjaInformes-macOS-AppleSilicon`.
 
 Consulta [Distribución y requisitos del equipo de destino](docs/DISTRIBUCION.md) para el primer inicio, ubicación de SQLite, builds locales, limitaciones de firma y requisitos de conversión a PDF. El workflow debe estar en la rama predeterminada de GitHub para aparecer en la interfaz de ejecución manual.
+
+Para un iMac con procesador Intel, descarga **SantotoTunjaInformes-macOS-Intel**. Para equipos con chips M1, M2, M3 u otros Apple Silicon, descarga **SantotoTunjaInformes-macOS-AppleSilicon**. Son builds nativos separados, no una aplicación universal.

@@ -22,11 +22,11 @@ Las rutas basadas en `__file__` y la búsqueda de plantilla mediante `_MEIPASS` 
 1. Sube los cambios, incluido `build.spec`, `.github/workflows/build.yml`, los nuevos iconos y `scripts/check_bundle.py`.
 2. El workflow debe estar presente en la rama predeterminada para aparecer en la interfaz de ejecución manual de GitHub. Si trabajas en `develop`, intégralo también en la rama predeterminada cuando corresponda.
 3. Abre **Actions → Build → Run workflow** y selecciona la rama a compilar.
-4. Al terminar ambos trabajos, descarga los artifacts de esa ejecución:
+4. Al terminar los tres trabajos, descarga los artifacts de esa ejecución:
    - `SantotoTunjaInformes-Windows`: contiene `SantotoTunjaInformes-Windows.zip`.
-   - `SantotoTunjaInformes-macOS`: contiene `SantotoTunjaInformes-macOS.zip`.
+   - `SantotoTunjaInformes-macOS-Intel` y `SantotoTunjaInformes-macOS-AppleSilicon`: contiene el ZIP de la arquitectura elegida.
 
-El workflow solo se activa manualmente. Ambos jobs hacen checkout de la misma revisión, usan Python 3.13 y PyInstaller 6.22.3, instalan las dependencias, ejecutan las pruebas, compilan y verifican el paquete. Windows se compila en `windows-latest` y macOS en `macos-latest`. No hay compilación cruzada. Los artifacts se conservan 14 días; descarga y guarda las entregas que necesites conservar.
+El workflow solo se activa manualmente. Los tres jobs hacen checkout de la misma revisión, usan Python 3.13 y PyInstaller 6.22.3, instalan las dependencias, ejecutan las pruebas, compilan y verifican el paquete. Windows se compila en `windows-latest` y macOS Apple Silicon en `macos-latest` y macOS Intel en `macos-15-intel`. No hay compilación cruzada. Los artifacts se conservan 14 días; descarga y guarda las entregas que necesites conservar.
 
 ## Qué recibe el usuario
 
@@ -74,3 +74,5 @@ python scripts/check_bundle.py
 `check_bundle.py` ejecuta el binario desde una carpeta temporal con Qt fuera de pantalla. Comprueba imports, apertura del login, imagen PNG, SVG, manual PDF, plantilla DOCX, script de docx2pdf y creación de SQLite en una carpeta temporal. No autentica con cuentas reales ni convierte con Office; la conversión efectiva a PDF y la apariencia final deben revisarse también en los equipos de entrega.
 
 Referencias: [specs de PyInstaller](https://pyinstaller.org/en/stable/spec-files.html), [rutas en ejecución](https://pyinstaller.org/en/stable/runtime-information.html), [workflows manuales de GitHub](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow).
+
+Para un iMac con procesador Intel, descarga **SantotoTunjaInformes-macOS-Intel**. Para equipos con chips M1, M2, M3 u otros Apple Silicon, descarga **SantotoTunjaInformes-macOS-AppleSilicon**. Son builds nativos separados, no una aplicación universal.
