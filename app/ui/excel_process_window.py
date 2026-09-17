@@ -23,6 +23,8 @@ from app.services.report_option_service import (
     update_report_option,
 )
 from app.services.report_path_service import (
+    POSTGRADUATE_TYPES,
+    ReportPaths,
     copy_source_csv,
     create_report_directory,
     prepare_report_paths,
@@ -397,6 +399,10 @@ class ExcelProcessWindow(QWidget):
         self.level = self._crear_lista_opciones("level")
         self.modality = self._crear_lista_opciones("modality")
         self.program = self._crear_lista_opciones("program")
+        self.postgraduate_type = QComboBox()
+        self.postgraduate_type.addItems(POSTGRADUATE_TYPES)
+        self.postgraduate_type.setPlaceholderText("Selecciona el tipo de posgrado")
+        self.postgraduate_type.setCurrentIndex(-1)
 
         campos = (
             ("01", "Periodo académico", self.period, "period"),
@@ -415,9 +421,16 @@ class ExcelProcessWindow(QWidget):
             )
             grid.setColumnStretch(columna, 1)
 
+        self.postgraduate_label = QLabel("TIPO DE POSGRADO")
+        self.postgraduate_label.setObjectName("sequenceFieldLabel")
+        grid.addWidget(self.postgraduate_label, 2, 0, 1, 2)
+        grid.addWidget(self.postgraduate_type, 3, 0, 1, 2)
+        self.level.currentTextChanged.connect(self._actualizar_tipo_posgrado)
+        self._actualizar_tipo_posgrado()
+
         self.configuration_summary = QLabel()
         self.configuration_summary.setObjectName("configurationSummary")
-        grid.addWidget(self.configuration_summary, 2, 0, 1, 4)
+        grid.addWidget(self.configuration_summary, 4, 0, 1, 4)
         root.addWidget(configuracion)
 
         archivos = QFrame()
@@ -476,7 +489,7 @@ class ExcelProcessWindow(QWidget):
         archivos_grid.addWidget(self.destination_label, 4, 0, 1, 3)
         root.addWidget(archivos)
 
-        for combo in (self.period, self.level, self.modality, self.program):
+        for combo in (self.period, self.level, self.modality, self.program, self.postgraduate_type):
             combo.currentTextChanged.connect(self._update_destination)
             combo.currentTextChanged.connect(self._actualizar_resumen_configuracion)
 
@@ -643,12 +656,19 @@ class ExcelProcessWindow(QWidget):
         lista.setCurrentText(valor_dialogo)
         self._update_destination()
 
+    def _actualizar_tipo_posgrado(self):
+        visible = self.level.currentText() == "Posgrado"
+        self.postgraduate_label.setVisible(visible)
+        self.postgraduate_type.setVisible(visible)
+
     def _actualizar_resumen_configuracion(self):
         """Explica visualmente cómo se combinarán los cuatro selectores."""
         resumen = "  /  ".join(
             selector.currentText()
             for selector in (self.period, self.level, self.modality, self.program)
         )
+        if self.level.currentText() == "Posgrado":
+            resumen += "  /  " + (self.postgraduate_type.currentText() or "Selecciona el tipo de posgrado")
         self.configuration_summary.setText(resumen)
 
     def _section_header(self, number, title):
@@ -708,6 +728,7 @@ class ExcelProcessWindow(QWidget):
                 self.modality.currentText(),
                 self.program.currentText(),
                 nombre_archivo_origen,
+                postgraduate_type=self.postgraduate_type.currentText() if self.level.currentText() == "Posgrado" else None,
             )
         except ValueError as error:
             self.destination_label.setText(str(error))
@@ -745,6 +766,7 @@ class ExcelProcessWindow(QWidget):
             self.level.currentText(),
             self.modality.currentText(),
             self.program.currentText(),
+            self.postgraduate_type.currentText() if self.level.currentText() == "Posgrado" else None,
         )
         self.steps[0].set_state("pending")
         self.steps[1].set_state("pending")
@@ -783,7 +805,7 @@ class ExcelProcessWindow(QWidget):
         # Los pasos usan la copia estable que acaba de quedar en la carpeta institucional.
         self.csv_path = self.report_paths.source_csv
         self._configuration_locked = True
-        for selector in (self.period, self.level, self.modality, self.program):
+        for selector in (self.period, self.level, self.modality, self.program, self.postgraduate_type):
             selector.setEnabled(False)
         self._actualizar_estado_boton_carga(True)
         self.steps[0].set_state("available")
@@ -879,7 +901,7 @@ class ExcelProcessWindow(QWidget):
             hilo_finalizado.deleteLater()
         self._restaurar_controles()
         if self._configuration_locked:
-            for selector in (self.period, self.level, self.modality, self.program):
+            for selector in (self.period, self.level, self.modality, self.program, self.postgraduate_type):
                 selector.setEnabled(False)
         self.load_button.setEnabled(bool(self.csv_path and self.base_directory))
         excel_disponible = self.excel_process.exists
@@ -1175,7 +1197,10 @@ class ExcelProcessWindow(QWidget):
             if len(candidates) == 1:
                 ruta_csv = candidates[0]
                 proceso["source_csv"] = str(ruta_csv)
-                academic_folder = ruta_excel.parent.parent.name.casefold()
+                academic_directory = ruta_excel.parent.parent
+                if academic_directory.name in POSTGRADUATE_TYPES:
+                    academic_directory = academic_directory.parent
+                academic_folder = academic_directory.name.casefold()
                 for value in list_report_options("level"):
                     if academic_folder.startswith(value.casefold() + "_"):
                         proceso["level"] = value
@@ -1203,6 +1228,9 @@ class ExcelProcessWindow(QWidget):
                 selector.addItem(valor)
             selector.setCurrentText(valor)
 
+        self.postgraduate_type.setCurrentIndex(
+            self.postgraduate_type.findText(ruta_excel.parent.parent.name)
+        )
         self.base_directory = proceso["base_directory"]
         self.csv_path = ruta_csv
         self.base_label.setText(str(self.base_directory))
@@ -1210,11 +1238,18 @@ class ExcelProcessWindow(QWidget):
         self.file_label.setText(ruta_csv.name)
         self.file_label.setToolTip(str(ruta_csv))
         self._update_destination()
+        # Conserva la ubicación registrada, incluidos informes anteriores al selector.
+        self.report_paths = ReportPaths(
+            directory=ruta_excel.parent, source_csv=ruta_csv,
+            excel=ruta_excel.parent / f"Informe_{proceso['period']}.xlsx",
+            word=None, pdf=None,
+        )
+        self.destination_label.setText(str(self.report_paths.directory))
         self.excel_process = ExcelProcess(ruta_excel)
         self.completed_step = int(proceso["completed_step"])
         self._report_saved = False
         self._configuration_locked = True
-        for selector in (self.period, self.level, self.modality, self.program):
+        for selector in (self.period, self.level, self.modality, self.program, self.postgraduate_type):
             selector.setEnabled(False)
 
         for indice, paso in enumerate(self.steps):

@@ -104,6 +104,16 @@ Fecha, Mes, Dia
 
 ## Instalación
 
+### Descargar la aplicación
+
+Las versiones compiladas están en [GitHub Releases](https://github.com/kevincardozo2986-crypto/plataforma-informes/releases/latest).
+
+- **Windows:** descarga `SantotoTunjaInformes-Windows.zip`, extrae toda la carpeta y abre `SantotoTunjaInformes.exe`.
+- **Mac con chips M:** descarga `SantotoTunjaInformes-macOS-AppleSilicon.zip` y extrae la aplicación `.app`.
+- **Mac con Intel:** descarga `SantotoTunjaInformes-macOS-Intel.zip` y extrae la aplicación `.app`.
+
+### Ejecutar desde el código fuente
+
 Clona el repositorio y entra en la carpeta del proyecto:
 
 ```bash

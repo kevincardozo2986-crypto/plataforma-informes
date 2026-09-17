@@ -1,4 +1,7 @@
+import pytest
+
 from app.services.report_path_service import (
+    POSTGRADUATE_TYPES,
     build_excel_path,
     build_report_directory,
     build_word_path,
@@ -6,6 +9,31 @@ from app.services.report_path_service import (
     prepare_report_paths,
     sanitize_name,
 )
+
+
+@pytest.mark.parametrize("modality", ["Presencial", "Virtual", "Presencial-Virtual"])
+@pytest.mark.parametrize("postgraduate_type", POSTGRADUATE_TYPES)
+def test_postgraduate_directory_includes_type(tmp_path, modality, postgraduate_type):
+    paths = prepare_report_paths(
+        tmp_path, "2026-1", "Posgrado", modality, "Programa", "datos.csv",
+        postgraduate_type=postgraduate_type,
+    )
+    assert paths.directory == (
+        tmp_path / "INFORMES USO PLATAFORMA 2026-1"
+        / f"Posgrado_{modality}" / postgraduate_type / "PROGRAMA"
+    )
+    assert paths.source_csv.parent == paths.excel.parent == paths.directory
+
+
+def test_postgraduate_requires_valid_selection_when_provided(tmp_path):
+    with pytest.raises(ValueError, match="tipo de posgrado"):
+        build_report_directory(tmp_path, "2026-1", "Posgrado", "Virtual", "Programa", "")
+
+
+def test_pregraduate_ignores_previous_postgraduate_selection(tmp_path):
+    assert build_report_directory(
+        tmp_path, "2026-1", "Pregrado", "Virtual", "Programa", "Doctorado"
+    ) == build_report_directory(tmp_path, "2026-1", "Pregrado", "Virtual", "Programa")
 
 
 def test_builds_institutional_directory_without_duplicates(tmp_path):

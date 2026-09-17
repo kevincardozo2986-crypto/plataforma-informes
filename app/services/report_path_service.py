@@ -12,6 +12,7 @@ RESERVED_WINDOWS_NAMES = {
     *(f"COM{number}" for number in range(1, 10)),
     *(f"LPT{number}" for number in range(1, 10)),
 }
+POSTGRADUATE_TYPES = ("Maestría", "Doctorado", "Especialización")
 VALID_LEVELS = {"Pregrado", "Posgrado"}
 VALID_MODALITIES = {"Presencial", "Virtual", "Presencial-Virtual"}
 
@@ -36,7 +37,7 @@ def sanitize_name(value, uppercase=False):
     return nombre_limpio.upper() if uppercase else nombre_limpio
 
 
-def build_report_directory(base_directory, period, level, modality, program):
+def build_report_directory(base_directory, period, level, modality, program, postgraduate_type=None):
     carpeta_base = Path(base_directory).expanduser()
     if not str(base_directory).strip():
         raise ValueError("Selecciona una carpeta base.")
@@ -47,7 +48,12 @@ def build_report_directory(base_directory, period, level, modality, program):
     periodo_seguro = sanitize_name(period)
     programa_seguro = sanitize_name(program, uppercase=True)
     categoria = f"{sanitize_name(level)}_{sanitize_name(modality)}"
-    return carpeta_base / f"INFORMES USO PLATAFORMA {periodo_seguro}" / categoria / programa_seguro
+    directory = carpeta_base / f"INFORMES USO PLATAFORMA {periodo_seguro}" / categoria
+    if level == "Posgrado" and postgraduate_type is not None:
+        if postgraduate_type not in POSTGRADUATE_TYPES:
+            raise ValueError("Selecciona el tipo de posgrado.")
+        directory /= postgraduate_type
+    return directory / programa_seguro
 
 
 def create_report_directory(*args, **kwargs):
@@ -70,8 +76,8 @@ def build_pdf_path(directory, period, program_code):
     return Path(directory) / f"Informe_{sanitize_name(period)}_{codigo_programa}.pdf"
 
 
-def prepare_report_paths(base_directory, period, level, modality, program, source_csv, program_code=None):
-    carpeta_informe = build_report_directory(base_directory, period, level, modality, program)
+def prepare_report_paths(base_directory, period, level, modality, program, source_csv, program_code=None, postgraduate_type=None):
+    carpeta_informe = build_report_directory(base_directory, period, level, modality, program, postgraduate_type)
     nombre_csv = sanitize_name(Path(source_csv).name)
     return ReportPaths(
         directory=carpeta_informe,
