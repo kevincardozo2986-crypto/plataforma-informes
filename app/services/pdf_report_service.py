@@ -86,22 +86,28 @@ def _convert_with_win32com(word_path, pdf_path):
     import pythoncom
     from win32com import client
 
-    pythoncom.CoInitialize()
-    word = None
-    try:
-        word = client.DispatchEx("Word.Application")
-        word.Visible = False
-        word.DisplayAlerts = False
-        document = word.Documents.Open(str(word_path), ReadOnly=True)
+    def export_pdf():
+        # Todos los objetos COM deben crearse y usarse en el mismo hilo.
+        pythoncom.CoInitialize()
+        word = None
         try:
-            # 17 = wdFormatPDF
-            _run_with_timeout(document.SaveAs, (str(pdf_path),), 180, "Word (COM)")
+            word = client.DispatchEx("Word.Application")
+            word.Visible = False
+            word.DisplayAlerts = False
+            document = word.Documents.Open(str(word_path), ReadOnly=True)
+            try:
+                # 17 = wdExportFormatPDF: exporta un PDF real.
+                document.ExportAsFixedFormat(str(pdf_path), 17)
+            finally:
+                document.Close(False)
         finally:
-            document.Close(False)
-    finally:
-        if word is not None:
-            word.Quit()
-        pythoncom.CoUninitialize()
+            try:
+                if word is not None:
+                    word.Quit()
+            finally:
+                pythoncom.CoUninitialize()
+
+    _run_with_timeout(export_pdf, (), 180, "Word (COM)")
 
 
 def find_soffice():
@@ -142,10 +148,7 @@ def _convert_with_libreoffice(word_path, pdf_path):
     soffice = find_soffice()
     if not soffice:
         raise FileNotFoundError(
-            "LibreOffice (soffice) no está instalado ni en el PATH. "
-            "Mac: brew install --cask libreoffice. "
-            "Windows: instala desde libreoffice.org y agrega "
-            "C:\\Program Files\\LibreOffice\\program al PATH."
+            "No se encontró LibreOffice instalado en este equipo."
         )
     word_path = _normalize_fs_path(word_path)
     if not word_path.is_file():
@@ -208,9 +211,10 @@ def convert_word_to_pdf(word_path, pdf_path=None, use_word_fallback=True):
 
     converters = [("LibreOffice", _convert_with_libreoffice)]
     if use_word_fallback:
-        converters.append(("docx2pdf (Word)", _convert_with_docx2pdf))
         if platform.system() == "Windows":
             converters.append(("Word (COM)", _convert_with_win32com))
+        elif platform.system() == "Darwin":
+            converters.append(("docx2pdf (Word)", _convert_with_docx2pdf))
 
     errors = []
     for name, converter in converters:
@@ -228,9 +232,9 @@ def convert_word_to_pdf(word_path, pdf_path=None, use_word_fallback=True):
     detail = "; ".join(errors) if errors else "sin conversor disponible"
     if platform.system() == "Windows":
         hint = (
-            "Instala LibreOffice desde libreoffice.org y agrega "
-            "C:\\Program Files\\LibreOffice\\program al PATH. "
-            "Respaldo con Word: pip install docx2pdf pywin32"
+            "Instala LibreOffice desde https://www.libreoffice.org/download/download-libreoffice/ "
+            "o comprueba que Microsoft Word esté instalado y pueda abrir el documento. "
+            "Después vuelve a intentar generar el PDF."
         )
     elif platform.system() == "Darwin":
         hint = "Instala LibreOffice con: brew install --cask libreoffice"

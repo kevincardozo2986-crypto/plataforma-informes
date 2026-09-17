@@ -90,7 +90,7 @@ jobs:
                 tag_name: tag,
                 name: `Santoto Tunja ${tag}`,
                 draft: true,
-                body: 'Descarga y extrae el ZIP de tu sistema. Windows: abre SantotoTunjaInformes.exe dentro de la carpeta extraída. macOS: abre SantotoTunjaInformes.app; elige AppleSilicon para chips M o Intel para procesadores Intel. Esta versión incluye la selección de Maestría, Doctorado y Especialización al elegir Posgrado.'
+                body: 'Descarga y extrae el ZIP de tu sistema. Windows: abre SantotoTunjaInformes.exe dentro de la carpeta extraída. macOS: abre SantotoTunjaInformes.app; elige AppleSilicon para chips M o Intel para procesadores Intel. Incluye la clasificación de posgrados y la corrección de la conversión a PDF con Microsoft Word en Windows. Para convertir a PDF se necesita LibreOffice o Microsoft Word instalado.'
               })).data;
             }
             for (const name of fs.readdirSync('artifacts').filter(name => name.endsWith('.zip'))) {
