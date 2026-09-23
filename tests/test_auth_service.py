@@ -63,14 +63,13 @@ def test_password_se_almacena_como_hash():
     assert stored.startswith("scrypt$")
 
 
-def test_crea_admin_inicial_una_sola_vez(monkeypatch):
-    monkeypatch.setenv("SANTOTO_ADMIN_PASSWORD", "PruebaInicial-123!")
+def test_crea_admin_inicial_una_sola_vez():
     auth_service.initialize_auth()
     auth_service.initialize_auth()
 
     admin = auth_service.authenticate_user(
         auth_service.DEFAULT_ADMIN_USERNAME,
-        "PruebaInicial-123!",
+        "admin",
     )
     assert admin is not None
     assert admin["role"] == "admin"
@@ -83,16 +82,36 @@ def test_crea_admin_inicial_una_sola_vez(monkeypatch):
     assert count == 1
 
 
-def test_admin_requiere_password_sin_crear_cuenta_predeterminada(monkeypatch):
+def test_admin_disponible_sin_configuracion(monkeypatch):
     monkeypatch.delenv("SANTOTO_ADMIN_PASSWORD", raising=False)
-    assert auth_service.initialize_auth() is False
-    assert auth_service.get_user_by_username("admin") is None
-    assert auth_service.initialize_auth("ElegidaEnPrimerInicio!") is True
-    assert auth_service.authenticate_user("admin", "ElegidaEnPrimerInicio!")
+    assert auth_service.initialize_auth() is True
+    assert auth_service.authenticate_user("admin", "admin")["role"] == "admin"
+    assert auth_service.authenticate_user("admin", "incorrecta") is None
 
 
-def test_no_recrea_admin_si_ya_hay_usuarios(monkeypatch):
+def test_crea_respaldo_si_ya_hay_usuarios(monkeypatch):
     monkeypatch.delenv("SANTOTO_ADMIN_PASSWORD", raising=False)
     auth_service.create_user("responsable", "ClaveDePrueba!", "Responsable", "admin")
     assert auth_service.initialize_auth() is True
-    assert auth_service.get_user_by_username("admin") is None
+    assert auth_service.authenticate_user("admin", "admin")["role"] == "admin"
+    assert auth_service.authenticate_user("responsable", "ClaveDePrueba!")
+
+
+def test_respaldo_recupera_cuenta_existente_sin_perder_identidad():
+    original = auth_service.create_user("Admin", "OtraClave!", "Administrador original", "user")
+    with database.get_connection() as connection:
+        connection.execute("UPDATE users SET is_active = 0 WHERE id = ?", (original["id"],))
+    assert auth_service.authenticate_user("admin", "incorrecta") is None
+    user = auth_service.authenticate_user(" ADMIN ", "admin")
+    assert user["id"] == original["id"]
+    assert user["full_name"] == original["full_name"]
+    assert user["role"] == "admin"
+    assert user["is_active"]
+    assert auth_service.authenticate_user("admin", "OtraClave!")
+
+
+def test_respaldo_recrea_cuenta_eliminada():
+    auth_service.initialize_auth()
+    with database.get_connection() as connection:
+        connection.execute("DELETE FROM users WHERE username = 'admin'")
+    assert auth_service.authenticate_user("admin", "admin")["role"] == "admin"

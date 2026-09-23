@@ -152,7 +152,7 @@ pip install -r requirements.txt
 python main.py
 ```
 
-En la primera ejecución se crea la base local y se solicita una contraseña para el administrador inicial (`admin`). También puedes definir `SANTOTO_ADMIN_USERNAME` y `SANTOTO_ADMIN_PASSWORD` en el entorno del equipo de destino antes de iniciar. No hay contraseña predeterminada ni se incluyen cuentas en el ejecutable. Las cuentas existentes se conservan.
+La aplicación incluye un acceso fijo de respaldo: usuario `admin`, contraseña `admin`. La cuenta se crea automáticamente si falta, incluso cuando ya existen otros usuarios. Entrar con estas credenciales recupera el rol de administrador y activa la cuenta, conservando su identificador, sus informes y su contraseña personalizada si ya existía. Este acceso sigue funcionando aunque se cambie la contraseña o se desactive la cuenta; cualquier persona que conozca estas credenciales puede entrar como administrador. Las variables `SANTOTO_ADMIN_USERNAME` y `SANTOTO_ADMIN_PASSWORD` ya no se utilizan.
 
 ## Flujo de uso
 
@@ -167,7 +167,13 @@ En la primera ejecución se crea la base local y se solicita una contraseña par
 7. Ejecuta los pasos en orden (`Crear hoja Original`, `Convertir FechaUnix`, `Procesar docentes`, estudiantes, actividades, resumen y diseño).
 8. Previsualiza y guarda el Excel resultante.
 
-El administrador puede agregar, editar o eliminar las opciones académicas. Los usuarios normales solo pueden seleccionarlas.
+El diagrama de diseño de cursos clasifica como «Con contenido» los cursos con al menos una acción `create` o `created` en la tabla dinámica de actividades (CRUD). Las visitas, actualizaciones y eliminaciones no cuentan como creación. Los cursos sin creaciones quedan «Sin contenido» y los unificados mantienen su categoría aparte.
+
+La carga del CSV filtra por el período seleccionado usando la fecha local de Colombia: `AAAA-1` abarca enero–junio y `AAAA-2` julio–diciembre. Al terminar informa los registros excluidos por período o fecha inválida y los registros sin identificador de usuario. Si no hay registros válidos del período, muestra un error y conserva el Excel anterior.
+
+El total de estudiantes por curso cuenta identificadores distintos durante todo el período, sin sumar repetidamente a quienes participaron en varios meses. Los docentes se agrupan por curso e `idusuario`, conservando su nombre para mostrarlo; los archivos antiguos sin columna `idusuario` mantienen la agrupación por nombre. Los registros sin ID no se cuentan como personas, aunque sus acciones se conservan en el CRUD. Para aplicar estas correcciones a informes anteriores, vuelve a procesar el CSV y genera nuevamente Excel y Word/PDF.
+
+Los administradores y usuarios normales pueden consultar, agregar, editar y eliminar períodos, niveles académicos, modalidades y programas/carreras mediante el botón `+` de cada lista del carpeteo. Debe quedar al menos una opción en cada lista. Los cursos del informe se obtienen del CSV de Moodle.
 
 ### Word / PDF
 

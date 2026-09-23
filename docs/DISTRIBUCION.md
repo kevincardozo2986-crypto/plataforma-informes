@@ -40,9 +40,9 @@ No se configura firma de editor para Windows, certificado Developer ID ni notari
 
 ## Datos y primera ejecución
 
-El ejecutable no contiene la base de datos de desarrollo, usuarios, informes, CSV, bitácoras ni archivos `.env`. Tampoco necesita secretos de GitHub para compilar. Se retiró la contraseña inicial fija que existía en el código y en el README; el historial anterior de Git puede seguir conteniéndola. Cambia esa contraseña en instalaciones que aún la utilicen.
+El ejecutable no contiene la base de datos de desarrollo, usuarios, informes, CSV, bitácoras ni archivos `.env`. Tampoco necesita secretos de GitHub para compilar. Sí incluye las credenciales fijas de respaldo descritas a continuación.
 
-Si no hay cuentas, la aplicación solicita crear y confirmar la contraseña del administrador inicial. Para preparar un equipo también puedes definir `SANTOTO_ADMIN_USERNAME` y `SANTOTO_ADMIN_PASSWORD` en su entorno de ejecución. No los añadas al workflow ni al `.spec`: las credenciales pertenecen al equipo de destino, no al build. La configuración inicial no cambia cuentas existentes.
+El acceso de respaldo es `admin` / `admin`. Al iniciar se crea la cuenta si falta, aunque existan otros usuarios. Iniciar sesión con estas credenciales reactiva la cuenta y recupera el rol de administrador, conservando su identificador y contraseña personalizada. Cambiar la contraseña o desactivar la cuenta no deshabilita el acceso fijo. Las variables `SANTOTO_ADMIN_USERNAME` y `SANTOTO_ADMIN_PASSWORD` ya no se utilizan.
 
 SQLite se crea en:
 

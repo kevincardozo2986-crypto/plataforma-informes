@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import csv
+import re
 
 import pandas as pd
 
@@ -29,8 +30,13 @@ def detect_csv_format(ruta_archivo):
     raise CSVValidationError("No fue posible detectar el formato del CSV.")
 
 
-def iter_csv_chunks(ruta_archivo, chunksize=25_000, prepare=False):
+def iter_csv_chunks(ruta_archivo, chunksize=25_000, prepare=False, period=None, stats=None):
     """Entrega bloques para evitar cargar archivos grandes completos en memoria."""
+    if period is not None and not re.fullmatch(r"\d{4}-[12]", period):
+        raise CSVValidationError("El periodo debe tener el formato AAAA-1 o AAAA-2.")
+    if stats is not None:
+        stats.update(outside_period=0, invalid_dates=0)
+    selected_rows = 0
     codificacion, separador = detect_csv_format(ruta_archivo)
     try:
         bloques_csv = pd.read_csv(
@@ -42,7 +48,21 @@ def iter_csv_chunks(ruta_archivo, chunksize=25_000, prepare=False):
         )
         for bloque_datos in bloques_csv:
             bloque_datos.columns = [str(columna).strip() for columna in bloque_datos.columns]
-            yield prepare_original_data(bloque_datos) if prepare else bloque_datos
+            if period is not None:
+                prepared = derive_date_columns_from_unix(bloque_datos, allow_invalid=True)
+                dates = pd.to_datetime(prepared["Fecha"])
+                year, semester = map(int, period.split("-"))
+                valid = dates.notna()
+                selected = valid & (dates.dt.year == year) & (((dates.dt.month - 1) // 6 + 1) == semester)
+                if stats is not None:
+                    stats["invalid_dates"] += int((~valid).sum())
+                    stats["outside_period"] += int((valid & ~selected).sum())
+                selected_rows += int(selected.sum())
+                yield prepared.loc[selected] if prepare else bloque_datos.loc[selected]
+            else:
+                yield prepare_original_data(bloque_datos) if prepare else bloque_datos
+        if period is not None and selected_rows == 0:
+            raise CSVValidationError(f"No hay registros con fechas válidas para el periodo {period}.")
     except pd.errors.ParserError as error:
         raise CSVValidationError(f"No fue posible interpretar el CSV: {error}") from error
 
@@ -98,7 +118,7 @@ def read_csv_file(ruta_archivo):
     return datos_csv
 
 
-def derive_date_columns_from_unix(datos, timezone="America/Bogota"):
+def derive_date_columns_from_unix(datos, timezone="America/Bogota", allow_invalid=False):
     """Agrega Fecha, Mes y Dia a partir de la columna FechaUnix de Moodle."""
     datos_preparados = datos.copy()
     columnas_normalizadas = {
@@ -110,10 +130,10 @@ def derive_date_columns_from_unix(datos, timezone="America/Bogota"):
 
     valores_numericos = pd.to_numeric(datos_preparados[columna_fecha_unix], errors="coerce")
     valores_validos = valores_numericos.dropna()
-    if valores_validos.empty:
+    if valores_validos.empty and not allow_invalid:
         raise CSVValidationError("La columna 'FechaUnix' no contiene valores Unix válidos.")
 
-    valor_representativo = valores_validos.abs().median()
+    valor_representativo = valores_validos.abs().median() if not valores_validos.empty else 0
     unidad_tiempo = "ms" if valor_representativo >= 100_000_000_000 else "s"
     fechas_utc = pd.to_datetime(
         valores_numericos, unit=unidad_tiempo, errors="coerce", utc=True

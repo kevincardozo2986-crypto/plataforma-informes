@@ -3,7 +3,7 @@ import traceback
 from pathlib import Path
 
 from PySide6.QtGui import QColor, QIcon, QPalette
-from PySide6.QtWidgets import QApplication, QInputDialog, QLineEdit
+from PySide6.QtWidgets import QApplication
 
 from app.services.auth_service import initialize_auth
 from app.ui.dashboard_window import DashboardWindow
@@ -52,26 +52,7 @@ def main():
 
     sys.excepthook = manejar_error_no_controlado
 
-    if not initialize_auth():
-        while True:
-            password, accepted = QInputDialog.getText(
-                None, "Primer inicio · Santoto Tunja",
-                "Crea la contraseña del administrador inicial:", QLineEdit.Password,
-            )
-            if not accepted:
-                return
-            if not password:
-                continue
-            confirmation, accepted = QInputDialog.getText(
-                None, "Confirmar contraseña", "Repite la contraseña:", QLineEdit.Password,
-            )
-            if not accepted:
-                return
-            if password != confirmation:
-                show_error(None, "Contraseñas diferentes", "Las contraseñas no coinciden. Intenta nuevamente.")
-                continue
-            initialize_auth(password)
-            break
+    initialize_auth()
 
     ventana_login = LoginWindow()
 

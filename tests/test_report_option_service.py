@@ -29,11 +29,40 @@ def test_administrador_puede_agregar_opcion(usuarios):
     assert "Derecho" in list_report_options("program")
 
 
-def test_usuario_normal_no_puede_agregar_opcion(usuarios):
+@pytest.mark.parametrize("categoria,valor", [
+    ("program", "Derecho"), ("period", "2028-2"),
+    ("level", "Educación continua"), ("modality", "A distancia"),
+])
+def test_usuario_normal_puede_agregar_opcion(usuarios, categoria, valor):
     _, usuario = usuarios
+    add_report_option(usuario, categoria, valor)
+    assert valor in list_report_options(categoria)
 
+
+@pytest.mark.parametrize("usuario", [None, {}, {"role": "user", "is_active": False}])
+def test_sin_sesion_activa_no_puede_agregar(usuarios, usuario):
     with pytest.raises(PermissionError):
         add_report_option(usuario, "program", "Derecho")
+    with pytest.raises(PermissionError):
+        update_report_option(usuario, "level", "Pregrado", "Otro")
+    with pytest.raises(PermissionError):
+        delete_report_option(usuario, "level", "Pregrado")
+
+
+@pytest.mark.parametrize("categoria,original,nuevo", [
+    ("period", "2028-1", "2028-2"),
+    ("program", "Derecho", "Derecho Virtual"),
+    ("level", "Educación continua", "Extensión"),
+    ("modality", "A distancia", "Mixta"),
+])
+def test_usuario_normal_puede_editar_opcion(usuarios, categoria, original, nuevo):
+    _, usuario = usuarios
+    add_report_option(usuario, categoria, original)
+    update_report_option(usuario, categoria, original, nuevo)
+    assert nuevo in list_report_options(categoria)
+    assert original not in list_report_options(categoria)
+    delete_report_option(usuario, categoria, nuevo)
+    assert nuevo not in list_report_options(categoria)
 
 
 def test_no_permite_opciones_duplicadas(usuarios):
@@ -71,11 +100,11 @@ def test_administrador_puede_eliminar_opcion(usuarios):
     assert "Derecho" not in list_report_options("program")
 
 
-def test_usuario_normal_no_puede_eliminar_opcion(usuarios):
+def test_usuario_normal_puede_eliminar_opcion(usuarios):
     _, usuario = usuarios
 
-    with pytest.raises(PermissionError):
-        delete_report_option(usuario, "program", "Ingeniería de Sistemas")
+    delete_report_option(usuario, "program", "Ingeniería de Sistemas")
+    assert "Ingeniería de Sistemas" not in list_report_options("program")
 
 
 def test_no_permite_eliminar_la_ultima_opcion(usuarios):

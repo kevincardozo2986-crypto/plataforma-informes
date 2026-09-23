@@ -9,6 +9,13 @@ from app.database.database import get_connection
 CATEGORIAS_VALIDAS = {"period", "level", "modality", "program"}
 
 
+def require_active_user(usuario_actual):
+    """Permite administrar el carpeteo a ambos roles con sesión activa."""
+    if (not usuario_actual or usuario_actual.get("role") not in {"admin", "user"}
+            or not usuario_actual.get("is_active")):
+        raise PermissionError("Debes iniciar sesión con un usuario activo para administrar opciones.")
+
+
 def list_report_options(categoria):
     """Devuelve las opciones disponibles de una categoría."""
     if categoria not in CATEGORIAS_VALIDAS:
@@ -28,9 +35,8 @@ def list_report_options(categoria):
 
 
 def add_report_option(usuario_actual, categoria, valor):
-    """Agrega una opción; solamente un administrador puede hacerlo."""
-    if not usuario_actual or usuario_actual.get("role") != "admin":
-        raise PermissionError("Solo un administrador puede agregar opciones.")
+    """Permite agregar opciones a administradores y usuarios activos."""
+    require_active_user(usuario_actual)
     if categoria not in CATEGORIAS_VALIDAS:
         raise ValueError("La categoría de opciones no es válida.")
 
@@ -59,8 +65,7 @@ def add_report_option(usuario_actual, categoria, valor):
 
 def delete_report_option(usuario_actual, categoria, valor):
     """Elimina una opción existente sin permitir que la lista quede vacía."""
-    if not usuario_actual or usuario_actual.get("role") != "admin":
-        raise PermissionError("Solo un administrador puede eliminar opciones.")
+    require_active_user(usuario_actual)
     if categoria not in CATEGORIAS_VALIDAS:
         raise ValueError("La categoría de opciones no es válida.")
 
@@ -82,8 +87,7 @@ def delete_report_option(usuario_actual, categoria, valor):
 
 def update_report_option(usuario_actual, categoria, valor_actual, valor_nuevo):
     """Cambia el texto de una opción existente."""
-    if not usuario_actual or usuario_actual.get("role") != "admin":
-        raise PermissionError("Solo un administrador puede editar opciones.")
+    require_active_user(usuario_actual)
     if categoria not in CATEGORIAS_VALIDAS:
         raise ValueError("La categoría de opciones no es válida.")
 

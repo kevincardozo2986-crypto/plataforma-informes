@@ -624,7 +624,7 @@ class ExcelProcessWindow(QWidget):
         fila.setSpacing(6)
         fila.addWidget(lista, 1)
 
-        if self.usuario_actual.get("role") == "admin":
+        if self.usuario_actual.get("role") in {"admin", "user"}:
             boton_agregar = QPushButton("+")
             boton_agregar.setObjectName("addOptionButton")
             boton_agregar.setToolTip(f"Administrar {nombre_visible}")
@@ -910,26 +910,29 @@ class ExcelProcessWindow(QWidget):
 
     def _prepare_information(self):
         self.steps[1].set_state("available", "Procesando…")
+        periodo = self.period.currentText()
         self._start_background(
-            lambda progress: self._write_original(prepare=True, progress=progress),
+            lambda progress: self._write_original(prepare=True, progress=progress, periodo=periodo),
             self._information_prepared,
             lambda message: self._task_failed(1, "Error al preparar la información", message),
         )
 
     def _create_original(self):
         self.steps[0].set_state("available", "Procesando…")
+        periodo = self.period.currentText()
         self._start_background(
-            lambda progress: self._write_original(prepare=False, progress=progress),
+            lambda progress: self._write_original(prepare=False, progress=progress, periodo=periodo),
             self._original_created,
             lambda message: self._task_failed(0, "Error al crear la hoja Original", message),
         )
 
-    def _write_original(self, prepare, progress):
+    def _write_original(self, prepare, progress, periodo):
         self._recover_source_csv_if_needed()
         progress(2)
         total_filas = estimate_csv_rows(self.csv_path)
+        self._csv_filter_stats = {}
         return self.excel_process.create_original_from_chunks(
-            iter_csv_chunks(self.csv_path, prepare=prepare),
+            iter_csv_chunks(self.csv_path, prepare=prepare, period=periodo, stats=self._csv_filter_stats),
             total_rows=total_filas,
             progress_callback=progress,
         )
@@ -947,6 +950,15 @@ class ExcelProcessWindow(QWidget):
             "Selecciónalo nuevamente con Examinar y reintenta el paso."
         )
 
+    def _csv_import_summary(self):
+        stats = getattr(self, "_csv_filter_stats", {})
+        return (
+            f" Fuera del período: {stats.get('outside_period', 0):,}."
+            f" Fechas inválidas excluidas: {stats.get('invalid_dates', 0):,}."
+            f" Registros sin ID de usuario: {getattr(self.excel_process, 'missing_user_ids', 0):,}"
+            " (se conservan como acciones, no se cuentan como personas)."
+        )
+
     def _original_created(self, resultado_creacion):
         cantidad_filas, cantidad_columnas = resultado_creacion
         self.steps[0].set_state("completed")
@@ -961,6 +973,7 @@ class ExcelProcessWindow(QWidget):
         self.save_button.setEnabled(True)
         self.feedback.setText(
             f"Hoja Original creada: {cantidad_filas:,} registros y {cantidad_columnas} columnas."
+            + self._csv_import_summary()
         )
         self.completed_step = 1
         self._guardar_avance(1)
@@ -978,6 +991,7 @@ class ExcelProcessWindow(QWidget):
         self.save_button.setEnabled(True)
         self.feedback.setText(
             f"FechaUnix convertida: se actualizaron {cantidad_filas:,} registros en la hoja Original."
+            + self._csv_import_summary()
         )
         self.completed_step = 2
         self._guardar_avance(2)

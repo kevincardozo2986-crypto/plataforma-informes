@@ -1,6 +1,6 @@
 import pandas as pd
 import pytest
-from openpyxl import load_workbook
+from openpyxl import Workbook, load_workbook
 
 from app.services.csv_service import iter_csv_chunks, prepare_original_data, read_csv_file
 from app.services.excel_service import ExcelProcess, suggested_filename
@@ -252,7 +252,7 @@ def test_crea_tabla_dinamica_estudiantes_con_dias_y_usuarios_unicos():
         None, "FEB", "MAR", "TOTAL", "FEB", "MAR", "TOTAL",
     ]
     assert hoja["D4"].value == "=SUM(B4:C4)"
-    assert hoja["G4"].value == "=SUM(E4:F4)"
+    assert hoja["G4"].value == 2
     assert hoja["A6"].value == "TOTAL GENERAL"
     assert hoja["I4"].value == "=MAX(D4:D5)"
     assert len(libro["Docentes DG"]._charts) == 1
@@ -261,7 +261,7 @@ def test_crea_tabla_dinamica_estudiantes_con_dias_y_usuarios_unicos():
     libro_valores = load_workbook(proceso.path, data_only=True)
     hoja_valores = libro_valores["Tabla Dinamica Estudiantes"]
     assert [hoja_valores.cell(4, columna).value for columna in range(1, 8)] == [
-        "Curso A", 2, 1, 3, 2, 1, 3,
+        "Curso A", 2, 1, 3, 2, 1, 2,
     ]
     assert [hoja_valores.cell(5, columna).value for columna in range(1, 8)] == [
         "Curso B", 0, 1, 1, 0, 1, 1,
@@ -305,13 +305,13 @@ def test_crea_tabla_dinamica_estudiantes_con_dias_y_usuarios_unicos():
     libro.close()
 
     indicadores = proceso.crear_diseno_cursos("Ingeniería", "2026-1")
-    assert indicadores == (0, 0, 2)
+    assert indicadores == (0, 1, 1)
     libro = load_workbook(proceso.path, data_only=True)
     diseno = libro["Diseño de Cursos"]
     assert [diseno.cell(5, columna).value for columna in range(3, 7)] == [
         "Unificados", "Sin contenido", "Con contenido", "Total",
     ]
-    assert [diseno.cell(6, columna).value for columna in range(3, 7)] == [0, 0, 2, 2]
+    assert [diseno.cell(6, columna).value for columna in range(3, 7)] == [0, 1, 1, 2]
     assert len(diseno._charts) == 1
     resumen = libro["Resumen Informe"]
     assert resumen["A1"].value.startswith("Resumen del informe Open LMS")
@@ -321,6 +321,33 @@ def test_crea_tabla_dinamica_estudiantes_con_dias_y_usuarios_unicos():
     assert len(libro["Estudiantes DG"]._charts) == 1
     assert len(libro["Estudiantes DG2"]._charts) == 1
     libro.close()
+
+@pytest.mark.parametrize("accion", ["create", "created", " CREATE ", "viewed"])
+def test_diseno_cursos_usa_creaciones_y_conserva_cursos_vacios(tmp_path, monkeypatch, accion):
+    ruta = tmp_path / "cursos.xlsx"
+    libro = Workbook()
+    hoja = libro.active
+    hoja.title = "Tabla Dinamica Actividades"
+    for _ in range(3):
+        hoja.append([None])
+    hoja.append(["Etiquetas de fila", accion, "updated", "deleted", "Total general"])
+    hoja.append(["Curso A", 7, 2, 0, 9])
+    hoja.append(["Curso B", 0, 4, 3, 7])
+    hoja.append(["Curso C", None, None, None, 0])
+    hoja.append(["Curso D", 0, 0, 0, 0])
+    hoja.append(["Curso_1A_2B", 5, 0, 0, 5])
+    hoja.append(["Total general", 12, 6, 3, 21])
+    libro.save(ruta)
+    libro.close()
+    proceso = ExcelProcess(ruta)
+    proceso._report_summary_cache = {}
+    enviados = []
+    monkeypatch.setattr(proceso, "crear_grafica_estudiantes", lambda *args: enviados.append(args))
+
+    esperado = (1, 4, 0) if accion == "viewed" else (1, 3, 1)
+    assert proceso.crear_diseno_cursos("Ingeniería", "2026-1") == esperado
+    assert enviados[0][4] == esperado
+
 
 def test_tabla_estudiantes_exige_idusuario():
     proceso = ExcelProcess()
