@@ -26,7 +26,7 @@ Las rutas basadas en `__file__` y la búsqueda de plantilla mediante `_MEIPASS` 
    - `SantotoTunjaInformes-Windows`: contiene `SantotoTunjaInformes-Windows.zip`.
    - `SantotoTunjaInformes-macOS-Intel` y `SantotoTunjaInformes-macOS-AppleSilicon`: contiene el ZIP de la arquitectura elegida.
 
-El workflow solo se activa manualmente. Los tres jobs hacen checkout de la misma revisión, usan Python 3.13 y PyInstaller 6.22.3, instalan las dependencias, ejecutan las pruebas, compilan y verifican el paquete. Windows se compila en `windows-latest` y macOS Apple Silicon en `macos-latest` y macOS Intel en `macos-15-intel`. No hay compilación cruzada. Los artifacts se conservan 14 días; descarga y guarda las entregas que necesites conservar.
+El workflow se activa manualmente o al subir una etiqueta `v*` (por ejemplo, `v1.0.2`). Los tres jobs hacen checkout de la misma revisión, usan Python 3.13 y PyInstaller 6.22.3, instalan las dependencias, ejecutan las pruebas, compilan y verifican el paquete. Windows se compila en `windows-latest` y macOS Apple Silicon en `macos-latest` y macOS Intel en `macos-15-intel`. No hay compilación cruzada. Los artifacts se conservan 14 días. Cuando se ejecuta desde una etiqueta, publica los tres ZIP en GitHub Releases después de completar las tres compilaciones.
 
 ## Qué recibe el usuario
 
