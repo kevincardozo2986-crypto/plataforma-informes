@@ -175,6 +175,8 @@ El total de estudiantes por curso cuenta identificadores distintos durante todo 
 
 Los administradores y usuarios normales pueden consultar, agregar, editar y eliminar períodos, niveles académicos, modalidades y programas/carreras mediante el botón `+` de cada lista del carpeteo. Debe quedar al menos una opción en cada lista. Los cursos del informe se obtienen del CSV de Moodle.
 
+Para pasar a otra carrera o tipo de posgrado, pulsa **Nuevo informe** o vuelve al dashboard. El avance pendiente queda en el historial y los selectores vuelven a estar disponibles. Durante el procesamiento se bloquean los cambios de origen y la generación simultánea de documentos. En macOS se utilizan los controles nativos de ventana.
+
 ### Word / PDF
 
 1. Abre el módulo de informe Word.

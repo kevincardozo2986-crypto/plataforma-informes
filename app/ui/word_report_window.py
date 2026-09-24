@@ -1,6 +1,7 @@
 """Explorador interactivo para convertir Excel terminados en informes Word."""
 
 from pathlib import Path
+import re
 
 from openpyxl import load_workbook
 from PySide6.QtCore import QObject, QSize, QThread, Qt, QUrl, Signal, Slot
@@ -263,6 +264,8 @@ class WordReportWindow(QWidget):
         self._load_completed_reports()
 
     def reset(self):
+        if self._thread is not None:
+            return
         self.search.clear()
         self.generated_path = None
         self.generated_pdf_path = None
@@ -271,6 +274,8 @@ class WordReportWindow(QWidget):
         self._load_completed_reports()
 
     def _load_completed_reports(self, *_):
+        if self._thread is not None:
+            return
         self.reports = [r for r in list_completed_processes(self.user) if Path(r["workbook_path"]).is_file()]
         self._populate_filter(self.period_filter, "Todos los periodos", "period")
         self._populate_filter(self.program_filter, "Todos los programas", "program")
@@ -357,6 +362,10 @@ class WordReportWindow(QWidget):
             self._set_selection(Path(report["workbook_path"]), report)
 
     def _set_selection(self, path, report):
+        if self._thread is not None:
+            return
+        self.generated_path = None
+        self.generated_pdf_path = None
         self.excel_path = path
         self.generated_path = None
         self.generated_pdf_path = None
@@ -389,6 +398,12 @@ class WordReportWindow(QWidget):
         return "No disponible"
 
     def _clear_selection(self, message):
+        if self._thread is not None:
+            return
+        self.generated_path = None
+        self.generated_pdf_path = None
+        self.open_button.hide()
+        self.pdf_button.hide()
         self.excel_path = None
         self.selection_badge.setText("SIN SELECCIÓN")
         self.selection_title.setText("Selecciona un Excel")
@@ -398,17 +413,36 @@ class WordReportWindow(QWidget):
         self.feedback.setText(message)
 
     def _select_excel(self):
+        if self._thread is not None:
+            return
         selected, _ = QFileDialog.getOpenFileName(self, "Seleccionar Excel terminado", "", "Archivos Excel (*.xlsx)")
         if not selected:
             return
         path = Path(selected)
-        period = next((p for p in list_report_options("period") if p in path.stem), "")
-        program = next((p for p in list_report_options("program") if p.casefold() in path.stem.replace("_", " ").casefold()), "")
+        try:
+            program, period = self._read_report_identity(path)
+        except (OSError, ValueError) as error:
+            show_error(self, "No se pudo abrir el informe", str(error))
+            return
         if not period or not program:
             show_error(self, "No se pudo identificar el informe", "Selecciona un Excel generado y terminado desde esta aplicacion.")
             return
         self.report_list.clearSelection()
         self._set_selection(path, {"program": program, "period": period, "owner_name": "Archivo externo"})
+
+    @staticmethod
+    def _read_report_identity(path):
+        workbook = load_workbook(path, read_only=True, data_only=True)
+        try:
+            if "Resumen Informe" not in workbook.sheetnames:
+                raise ValueError("El Excel no está terminado: falta la hoja Resumen Informe.")
+            title = str(workbook["Resumen Informe"]["A1"].value or "")
+            match = re.fullmatch(r"Resumen del informe Open LMS - (.+) (\d{4}-[12])", title.strip())
+            if not match:
+                raise ValueError("No se pudo identificar el programa y el período dentro del Excel.")
+            return match.group(1), match.group(2)
+        finally:
+            workbook.close()
 
     def _destination(self):
         return build_word_path(self.excel_path.parent, self.current_period, self.current_program)
@@ -417,16 +451,19 @@ class WordReportWindow(QWidget):
         return build_pdf_path(self.excel_path.parent, self.current_period, self.current_program)
 
     def _generate(self):
+        if self._thread is not None:
+            return
         if not self.excel_path:
             return
         destination = self._destination()
         if destination.exists() and not ask_confirmation(self, "El informe ya existe", f"Ya existe {destination.name}.\n\nDeseas reemplazarlo?"):
             return
-        self.generate_button.setEnabled(False)
+        self._lock_controls()
         self.progress.show()
         self.feedback.setText("Generando graficos, tablas y documento institucional...")
         self._thread = QThread(self)
-        self._worker = WordGenerationTask(lambda: generate_word_report(self.excel_path, destination, self.current_program, self.current_period))
+        excel_path, program, period = self.excel_path, self.current_program, self.current_period
+        self._worker = WordGenerationTask(lambda: generate_word_report(excel_path, destination, program, period))
         self._worker.moveToThread(self._thread)
         self._thread.started.connect(self._worker.run)
         self._worker.finished.connect(self._generated)
@@ -454,17 +491,20 @@ class WordReportWindow(QWidget):
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.generated_path.resolve())))
 
     def _generate_pdf(self):
+        if self._thread is not None:
+            return
         if not self.generated_path or not self.generated_path.is_file():
             show_error(self, "Genera primero el Word", "Primero crea el documento Word para poder generar el PDF.")
             return
         destination = self._pdf_destination()
         if destination.exists() and not ask_confirmation(self, "El PDF ya existe", f"Ya existe {destination.name}.\n\nDeseas reemplazarlo?"):
             return
-        self.pdf_button.setEnabled(False)
+        self._lock_controls()
         self.progress.show()
         self.feedback.setText("Generando PDF a partir del documento Word...")
         self._thread = QThread(self)
-        self._worker = WordGenerationTask(lambda: convert_word_to_pdf(self.generated_path, destination))
+        source = self.generated_path
+        self._worker = WordGenerationTask(lambda: convert_word_to_pdf(source, destination))
         self._worker.moveToThread(self._thread)
         self._thread.started.connect(self._worker.run)
         self._worker.finished.connect(self._pdf_generated)
@@ -493,5 +533,15 @@ class WordReportWindow(QWidget):
         if thread:
             thread.deleteLater()
         self.progress.hide()
+        for control, enabled in getattr(self, "_control_states", {}).items():
+            control.setEnabled(enabled)
+        self._control_states = {}
         self.generate_button.setEnabled(bool(self.excel_path))
         self.pdf_button.setEnabled(bool(self.generated_path))
+
+    def _lock_controls(self):
+        controls = [*self.findChildren(QPushButton), *self.findChildren(QComboBox),
+                    *self.findChildren(QListWidget), *self.findChildren(QLineEdit)]
+        self._control_states = {control: control.isEnabled() for control in controls}
+        for control in controls:
+            control.setEnabled(False)

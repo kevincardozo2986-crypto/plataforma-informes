@@ -90,7 +90,7 @@ jobs:
                 tag_name: tag,
                 name: `Santoto Tunja ${tag}`,
                 draft: true,
-                body: 'Descarga y extrae el ZIP de tu sistema. Windows: abre SantotoTunjaInformes.exe dentro de la carpeta extraída. macOS: abre SantotoTunjaInformes.app; elige AppleSilicon para chips M o Intel para procesadores Intel. Esta versión corrige el diseño de cursos según create/created, el recuento de estudiantes únicos, la identificación de docentes y los campos vacíos. Filtra el CSV por año y semestre (enero-junio o julio-diciembre) y permite a los usuarios el CRUD completo de opciones académicas. Incluye el acceso fijo de respaldo admin / admin. Para actualizar informes anteriores, vuelve a procesar el CSV. Para convertir a PDF se necesita LibreOffice o Microsoft Word instalado.'
+                body: 'Descarga y extrae el ZIP de tu sistema: Windows, macOS AppleSilicon (chips M) o macOS Intel. Corrige el bloqueo de selectores al comenzar otro informe, permite cambiar entre doctorado y especializaci?n mediante Nuevo informe y restaura los botones de gr?ficos. Admite niveles y modalidades creados en el CRUD y conserva las opciones eliminadas al reiniciar. Word reconoce los datos dentro del Excel y se impiden tareas simult?neas y cierres durante el procesamiento. macOS utiliza controles nativos de ventana. Conserva las correcciones de c?lculos y el acceso de respaldo admin / admin. Para PDF se necesita LibreOffice o Microsoft Word.'
               })).data;
             }
             for (const name of fs.readdirSync('artifacts').filter(name => name.endsWith('.zip'))) {

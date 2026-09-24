@@ -311,7 +311,7 @@ class DashboardWindow(QMainWindow):
         layout.addStretch()
         logout = self._nav("Cerrar sesión", "logout.svg")
         logout.setObjectName("logoutNavButton")
-        logout.clicked.connect(self.logout_requested.emit)
+        logout.clicked.connect(self._request_logout)
         layout.addWidget(logout)
         return sidebar
 
@@ -575,3 +575,20 @@ class DashboardWindow(QMainWindow):
 
     def _show_dashboard(self):
         self.stack.setCurrentWidget(self.home_page)
+
+    def _has_running_task(self):
+        return any(getattr(page, "_thread", None) is not None
+                   for page in (self.excel_page, self.word_page))
+
+    def _request_logout(self):
+        if self._has_running_task():
+            show_info(self, "Proceso en curso", "Espera a que termine el procesamiento antes de cerrar sesión.")
+            return
+        self.logout_requested.emit()
+
+    def closeEvent(self, event):
+        if self._has_running_task():
+            event.ignore()
+            show_info(self, "Proceso en curso", "Espera a que termine el procesamiento antes de cerrar la aplicación.")
+            return
+        super().closeEvent(event)

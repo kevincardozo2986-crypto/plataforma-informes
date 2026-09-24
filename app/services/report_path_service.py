@@ -41,10 +41,13 @@ def build_report_directory(base_directory, period, level, modality, program, pos
     carpeta_base = Path(base_directory).expanduser()
     if not str(base_directory).strip():
         raise ValueError("Selecciona una carpeta base.")
-    if level not in VALID_LEVELS:
-        raise ValueError("El nivel académico no es válido.")
-    if modality not in VALID_MODALITIES:
-        raise ValueError("La modalidad no es válida.")
+    # Las opciones se administran desde el CRUD; no limitar a los valores iniciales.
+    level = str(level or "").strip()
+    modality = str(modality or "").strip()
+    if not level:
+        raise ValueError("Selecciona el nivel académico.")
+    if not modality:
+        raise ValueError("Selecciona la modalidad.")
     periodo_seguro = sanitize_name(period)
     programa_seguro = sanitize_name(program, uppercase=True)
     categoria = f"{sanitize_name(level)}_{sanitize_name(modality)}"

@@ -1,6 +1,7 @@
 """Barra de título integrada para ventanas y diálogos sin marco nativo."""
 
 from pathlib import Path
+import sys
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
@@ -151,5 +152,11 @@ class WindowTitleBar(QWidget):
 
 
 def preparar_ventana_sin_marco(ventana, titulo, controles_completos=False, mostrar_logo=True):
+    if sys.platform == "darwin":
+        ventana.setWindowTitle(titulo)
+        ventana.setWindowFlag(Qt.FramelessWindowHint, False)
+        separador = QWidget(ventana)
+        separador.setFixedHeight(0)
+        return separador
     ventana.setWindowFlags(ventana.windowFlags() | Qt.FramelessWindowHint)
     return WindowTitleBar(ventana, titulo, controles_completos, mostrar_logo)

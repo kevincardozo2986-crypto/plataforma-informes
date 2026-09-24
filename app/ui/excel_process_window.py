@@ -123,6 +123,7 @@ class ProcessStepRow(QFrame):
         mostrar_excel = self.has_chart and state == "completed"
         self.button.setVisible(not mostrar_excel)
         self.view_button.setVisible(mostrar_excel)
+        self.view_button.setEnabled(mostrar_excel)
 
 
 class OptionManagementDialog(QDialog):
@@ -287,6 +288,8 @@ class ExcelProcessWindow(QWidget):
 
     def _limpiar_formulario(self):
         """Desvincula el proceso actual y devuelve el módulo a su estado inicial."""
+        if self._thread and self._thread.isRunning():
+            return
         carpeta_conservada = self.base_directory
         self.excel_process = ExcelProcess()
         self.csv_path = None
@@ -295,6 +298,7 @@ class ExcelProcessWindow(QWidget):
         self.completed_step = 0
         self._report_saved = False
         self._configuration_locked = False
+        self._set_configuration_enabled(True)
         for paso in self.steps:
             paso.set_state("pending")
         self.file_label.setText("Ningún archivo seleccionado")
@@ -316,6 +320,8 @@ class ExcelProcessWindow(QWidget):
 
     def _volver_al_dashboard(self):
         """Archiva el avance pendiente y libera la pantalla para otro informe."""
+        if self._thread and self._thread.isRunning():
+            return
         proceso_cargado = (
             self.report_paths is not None
             and self.csv_path is not None
@@ -328,6 +334,21 @@ class ExcelProcessWindow(QWidget):
             self._guardar_avance(self.completed_step)
         self._limpiar_formulario()
         self.back_requested.emit()
+
+    def _nuevo_informe(self):
+        if self._thread and self._thread.isRunning():
+            return
+        if self._configuration_locked and not self._report_saved:
+            self._guardar_avance(self.completed_step)
+        self._limpiar_formulario()
+
+    def _set_configuration_enabled(self, enabled):
+        for selector in (self.period, self.level, self.modality, self.program, self.postgraduate_type):
+            selector.setEnabled(enabled)
+        for boton in self.findChildren(QPushButton, "addOptionButton"):
+            boton.setEnabled(enabled)
+        self.select_csv_button.setEnabled(enabled)
+        self.select_base_button.setEnabled(enabled)
 
     def _build_ui(self):
         diseno_exterior = QVBoxLayout(self)
@@ -355,6 +376,10 @@ class ExcelProcessWindow(QWidget):
         back.clicked.connect(self._volver_al_dashboard)
         top.addWidget(back)
         top.addStretch()
+        self.new_report_button = QPushButton("Nuevo informe")
+        self.new_report_button.setObjectName("secondaryExcelButton")
+        self.new_report_button.clicked.connect(self._nuevo_informe)
+        top.addWidget(self.new_report_button)
         root.addLayout(top)
         eyebrow = QLabel("PROCESO GUIADO  •  CSV → EXCEL")
         eyebrow.setObjectName("excelEyebrow")
@@ -449,11 +474,13 @@ class ExcelProcessWindow(QWidget):
         select = QPushButton("Examinar")
         select.setObjectName("secondaryExcelButton")
         select.clicked.connect(self._select_csv)
+        self.select_csv_button = select
         self.base_label = QLabel("Ninguna carpeta base seleccionada")
         self.base_label.setObjectName("selectedCsvLabel")
         select_base = QPushButton("Seleccionar carpeta")
         select_base.setObjectName("secondaryExcelButton")
         select_base.clicked.connect(self._select_base_directory)
+        self.select_base_button = select_base
         self.load_button = QPushButton("↑  CARGAR CSV")
         self.load_button.setObjectName("blueExcelButton")
         self.load_button.setFixedWidth(190)
@@ -714,6 +741,8 @@ class ExcelProcessWindow(QWidget):
         self._update_destination()
 
     def _update_destination(self):
+        if self._configuration_locked:
+            return
         self.report_paths = None
         if not self.base_directory:
             self.destination_label.setText("Selecciona una carpeta base para construir la ruta institucional.")
@@ -738,6 +767,8 @@ class ExcelProcessWindow(QWidget):
         self.load_button.setEnabled(bool(self.csv_path))
 
     def _load_csv(self):
+        if self._configuration_locked:
+            return
         self._update_destination()
         if not self.report_paths or not self.csv_path:
             return
@@ -805,9 +836,9 @@ class ExcelProcessWindow(QWidget):
         # Los pasos usan la copia estable que acaba de quedar en la carpeta institucional.
         self.csv_path = self.report_paths.source_csv
         self._configuration_locked = True
-        for selector in (self.period, self.level, self.modality, self.program, self.postgraduate_type):
-            selector.setEnabled(False)
+        self._set_configuration_enabled(False)
         self._actualizar_estado_boton_carga(True)
+        self.load_button.setEnabled(False)
         self.steps[0].set_state("available")
         self.steps[1].set_state("pending")
         self.steps[2].set_state("pending")
@@ -853,14 +884,24 @@ class ExcelProcessWindow(QWidget):
         self._worker.moveToThread(self._thread)
         self._thread.started.connect(self._worker.run)
         self._worker.progress.connect(self.progress_bar.setValue)
-        self._worker.finished.connect(on_success)
-        self._worker.failed.connect(on_error)
+        self._on_task_success = on_success
+        self._on_task_error = on_error
+        self._worker.finished.connect(self._dispatch_success, Qt.QueuedConnection)
+        self._worker.failed.connect(self._dispatch_error, Qt.QueuedConnection)
         self._worker.finished.connect(self._thread.quit)
         self._worker.failed.connect(self._thread.quit)
         self._worker.finished.connect(self._worker.deleteLater)
         self._worker.failed.connect(self._worker.deleteLater)
         self._thread.finished.connect(self._finish_background)
         self._thread.start()
+
+    @Slot(object)
+    def _dispatch_success(self, result):
+        self._on_task_success(result)
+
+    @Slot(str)
+    def _dispatch_error(self, message):
+        self._on_task_error(message)
 
     def _bloquear_controles(self):
         """Evita acciones simultáneas mientras se modifica el Excel."""
@@ -901,9 +942,10 @@ class ExcelProcessWindow(QWidget):
             hilo_finalizado.deleteLater()
         self._restaurar_controles()
         if self._configuration_locked:
-            for selector in (self.period, self.level, self.modality, self.program, self.postgraduate_type):
-                selector.setEnabled(False)
-        self.load_button.setEnabled(bool(self.csv_path and self.base_directory))
+            self._set_configuration_enabled(False)
+        for paso in self.steps:
+            paso.set_state(paso.state)
+        self.load_button.setEnabled(bool(self.csv_path and self.report_paths and not self._configuration_locked))
         excel_disponible = self.excel_process.exists
         self.preview_button.setEnabled(excel_disponible)
         self.save_button.setEnabled(excel_disponible)
@@ -1203,6 +1245,8 @@ class ExcelProcessWindow(QWidget):
 
     def resume_process(self, proceso):
         """Restaura la configuración y habilita el siguiente paso pendiente."""
+        if self._thread and self._thread.isRunning():
+            return False
         proceso = dict(proceso)
         ruta_excel = Path(proceso["workbook_path"])
         ruta_csv = Path(proceso["source_csv"])
@@ -1263,8 +1307,8 @@ class ExcelProcessWindow(QWidget):
         self.completed_step = int(proceso["completed_step"])
         self._report_saved = False
         self._configuration_locked = True
-        for selector in (self.period, self.level, self.modality, self.program, self.postgraduate_type):
-            selector.setEnabled(False)
+        self._set_configuration_enabled(False)
+        self.load_button.setEnabled(False)
 
         for indice, paso in enumerate(self.steps):
             if indice < self.completed_step:

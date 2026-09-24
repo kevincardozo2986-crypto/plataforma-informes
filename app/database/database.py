@@ -47,6 +47,9 @@ def get_connection() -> Iterator[sqlite3.Connection]:
 def initialize_database() -> None:
     """Crea las tablas y opciones iniciales de la aplicación."""
     with get_connection() as conexion:
+        opciones_existentes = conexion.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'report_options'"
+        ).fetchone() is not None
         conexion.execute(
             """
             CREATE TABLE IF NOT EXISTS users (
@@ -83,6 +86,8 @@ def initialize_database() -> None:
             ),
         }
         for categoria, valores in opciones_iniciales.items():
+            if opciones_existentes:
+                break
             conexion.executemany(
                 "INSERT OR IGNORE INTO report_options (category, value) VALUES (?, ?)",
                 ((categoria, valor) for valor in valores),
